@@ -1,0 +1,17 @@
+{
+  "name": "portfoliohq-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node ../node_modules/tsx/dist/cli.mjs index.ts",
+    "start": "node ../node_modules/tsx/dist/cli.mjs index.ts",
+    "db:generate": "node scripts/prisma.mjs generate --schema server/prisma/schema.prisma",
+    "db:push": "node scripts/prisma.mjs db push --schema server/prisma/schema.prisma"
+  },
+  "dependencies": {
+    "cors": "^2.8.6"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19"
+  }
+}

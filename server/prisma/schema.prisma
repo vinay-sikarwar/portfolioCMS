@@ -1,0 +1,82 @@
+// Prisma schema for PortfolioHQ unified headless CMS database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String
+  avatar      String?
+  firebaseUid String?  @unique
+  apiSlug     String   @unique @default(cuid())
+  role        String   @default("user")
+  plan        String   @default("Pro")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  apiKeys      ApiKey[]
+  sections     Section[]
+  contentItems ContentItem[]
+}
+
+model ApiKey {
+  id        String    @id @default(cuid())
+  name      String
+  token     String    @unique
+  keyPrefix String    @default("phq_live_")
+  role      String    @default("Read-Only") // "Read-Only" | "Read & Write"
+  status    String    @default("Active")    // "Active" | "Revoked"
+  lastUsed  DateTime?
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Section {
+  id           String        @id @default(cuid())
+  name         String        // Display name, e.g. "Projects", "Blog Posts", "Skills"
+  singularName String        // Singular name, e.g. "Project", "Blog Post", "Skill"
+  slug         String        // URL slug, e.g. "projects", "posts", "skills"
+  icon         String        @default("layers")
+  description  String?
+  fields       Json          @default("[]") // Custom field definitions as PostgreSQL JSON
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items        ContentItem[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([userId, slug])
+  @@index([userId])
+}
+
+model ContentItem {
+  id        String   @id @default(cuid())
+  sectionId String
+  section   Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  slug      String?  // Optional URL slug for item-level routing
+  status    String   @default("Live") // "Live" | "Draft" | "Archived"
+  category  String?
+  summary   String?
+  data      Json     @default("{}") // Custom dynamic schema attributes
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([sectionId])
+  @@index([userId, sectionId])
+  @@unique([userId, sectionId, slug])
+}
