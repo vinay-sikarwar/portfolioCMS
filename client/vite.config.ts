@@ -1,9 +1,12 @@
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 
-export default defineConfig(() => {
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, path.resolve(__dirname, ".."), "");
+  const apiTarget = env.VITE_API_BASE_URL || "http://localhost:3000";
+
   return {
     envDir: path.resolve(__dirname, ".."),
     plugins: [react(), tailwindcss()],
@@ -14,20 +17,15 @@ export default defineConfig(() => {
     },
     server: {
       port: 5173,
-      headers: {
-        "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
-      },
       proxy: {
-        "/api": "http://localhost:3000",
-        "/skills": "http://localhost:3000",
+        "/api": {
+          target: apiTarget,
+          changeOrigin: true,
+          secure: false,
+        },
       },
       hmr: process.env.DISABLE_HMR !== "true",
       watch: process.env.DISABLE_HMR === "true" ? null : {},
-    },
-    preview: {
-      headers: {
-        "Cross-Origin-Opener-Policy": "same-origin-allow-popups",
-      },
     },
   };
 });
