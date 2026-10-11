@@ -2,15 +2,17 @@ import express, { Request, Response } from "express";
 import { randomBytes } from "node:crypto";
 import cors from 'cors';
 import dotenv from "dotenv";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { prisma, seedInitialDataIfEmpty } from "./db.js";
 import { generateToken, verifyFirebaseIdToken, verifyToken } from "./auth.js";
 
-dotenv.config();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+dotenv.config();
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -1143,12 +1145,19 @@ app.get("/api/:sectionSlug", async (req: Request, res: Response, next: () => voi
 });
 
 
-// Serve the built client only in production. During development, Vite runs separately.
+// Serve the built client only in production if it exists.
 if (isProd) {
-  app.use(express.static(path.resolve(__dirname, "../client/dist")));
-  app.get("*", (_req, res) => {
-    res.sendFile(path.resolve(__dirname, "../client/dist", "index.html"));
-  });
+  const clientDist = path.resolve(__dirname, "../client/dist");
+  if (fs.existsSync(clientDist)) {
+    app.use(express.static(clientDist));
+    app.get("*", (_req, res) => {
+      res.sendFile(path.resolve(clientDist, "index.html"));
+    });
+  } else {
+    app.get("/", (_req, res) => {
+      res.json({ status: "ok", message: "PortfolioHQ API server is running" });
+    });
+  }
 }
 
 app.listen(PORT, () => {

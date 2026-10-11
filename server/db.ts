@@ -5,6 +5,7 @@
   import { PrismaClient } from "@prisma/client";
 
   const serverDir = path.dirname(fileURLToPath(import.meta.url));
+  dotenv.config();
   dotenv.config({ path: path.resolve(serverDir, "../.env") });
 
   declare global {
