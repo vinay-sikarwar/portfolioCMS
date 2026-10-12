@@ -18,7 +18,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === "production";
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 app.use(cors());
 app.use((_req, res, next) => {
@@ -475,6 +476,7 @@ app.get("/api/v1/:apiSlug/sections", async (req: Request, res: Response) => {
             { id: "f_category", key: "category", label: "Category", type: "text", required: true, placeholder: "e.g. E-commerce, Mobile" },
             { id: "f_status", key: "status", label: "Status", type: "select", required: true, isSystem: true, options: ["Live", "Draft", "Updated"] },
             { id: "f_summary", key: "summary", label: "Summary / Description", type: "textarea", placeholder: "Short overview of the project..." },
+            { id: "f_image", key: "image", label: "Project Thumbnail / Photo", type: "image", placeholder: "Upload or paste project image" },
             { id: "f_client", key: "client", label: "Client", type: "text", placeholder: "e.g. Google, Stripe" },
             { id: "f_link", key: "link", label: "Live URL", type: "url", placeholder: "https://example.com" },
           ],
@@ -490,9 +492,25 @@ app.get("/api/v1/:apiSlug/sections", async (req: Request, res: Response) => {
             { id: "f_post_title", key: "title", label: "Post Title", type: "text", required: true, isSystem: true, placeholder: "e.g. Building Scalable APIs" },
             { id: "f_post_slug", key: "slug", label: "URL Slug", type: "text", required: true, isSystem: true, placeholder: "building-scalable-apis" },
             { id: "f_post_status", key: "status", label: "Status", type: "select", required: true, isSystem: true, options: ["Live", "Draft", "Updated"] },
+            { id: "f_post_cover", key: "coverImage", label: "Cover Image", type: "image", placeholder: "Upload or paste cover image" },
             { id: "f_post_author", key: "author", label: "Author", type: "text", placeholder: "Author name" },
             { id: "f_post_excerpt", key: "excerpt", label: "Summary / Excerpt", type: "textarea", placeholder: "Brief article summary..." },
             { id: "f_post_body", key: "body", label: "Content (Markdown)", type: "textarea", placeholder: "Write your article in Markdown..." },
+          ],
+        },
+        {
+          userId: req.userId,
+          name: "Skills",
+          singularName: "Skill",
+          slug: "skills",
+          icon: "sparkles",
+          description: "Technical stack, programming languages, and proficiencies",
+          fields: [
+            { id: "f_skill_name", key: "title", label: "Skill Name", type: "text", required: true, isSystem: true, placeholder: "e.g. React, TypeScript, Node.js" },
+            { id: "f_skill_category", key: "category", label: "Category", type: "text", required: true, placeholder: "e.g. Frontend, Backend, DevOps" },
+            { id: "f_skill_status", key: "status", label: "Status", type: "select", required: true, isSystem: true, options: ["Live", "Draft", "Updated"] },
+            { id: "f_skill_image", key: "image", label: "Skill Icon / Photo", type: "image", placeholder: "Upload skill logo or badge" },
+            { id: "f_skill_summary", key: "summary", label: "Proficiency / Description", type: "textarea", placeholder: "e.g. 5+ years experience, production architecture" },
           ],
         },
       ];
@@ -806,7 +824,12 @@ app.post("/api/v1/:apiSlug/:sectionSlug", async (req: Request, res: Response) =>
       });
     }
 
-    const fullCustomData = restData.data || restData;
+    const incomingData = typeof restData.data === "object" && restData.data !== null ? restData.data : restData;
+    const fullCustomData = {
+      ...incomingData,
+      ...(req.body.image !== undefined ? { image: req.body.image } : {}),
+      ...(req.body.coverImage !== undefined ? { coverImage: req.body.coverImage } : {}),
+    };
 
     const item = await prisma.contentItem.create({
       data: {
@@ -860,7 +883,18 @@ app.put("/api/v1/:apiSlug/:sectionSlug/:id", async (req: Request, res: Response)
       return;
     }
 
-    const fullCustomData = restData.data || restData;
+    let existingCustom = {};
+    try {
+      existingCustom = typeof existing.data === "string" ? JSON.parse(existing.data) : (existing.data || {});
+    } catch {}
+
+    const incomingData = typeof restData.data === "object" && restData.data !== null ? restData.data : restData;
+    const fullCustomData = {
+      ...existingCustom,
+      ...incomingData,
+      ...(req.body.image !== undefined ? { image: req.body.image } : {}),
+      ...(req.body.coverImage !== undefined ? { coverImage: req.body.coverImage } : {}),
+    };
 
     const item = await prisma.contentItem.update({
       where: { id },

@@ -27,6 +27,7 @@ import {
   Clock,
   FileText,
 } from "lucide-react";
+import { SingleImageUploader } from "./SingleImageUploader";
 
 export interface ArticleItemData {
   id: string;
@@ -182,6 +183,7 @@ export const ArticleEditorView: React.FC<ArticleEditorViewProps> = ({
       title: title.trim(),
       slug: slug.trim() || undefined,
       coverImage: coverImage || undefined,
+      image: coverImage || undefined,
       content,
       body: content, // compatibility with body
       summary: summary.trim(),
@@ -273,7 +275,7 @@ export const ArticleEditorView: React.FC<ArticleEditorViewProps> = ({
   return (
     <div className="flex-1 flex flex-col h-full bg-[#FAFBF9] overflow-hidden">
       {/* 1. TOP AUTHORING BAR */}
-      <header className="h-16 border-b border-[#E3EAE0] bg-white px-4 md:px-8 flex items-center justify-between shrink-0 z-10 shadow-2xs">
+      <header className="min-h-16 py-2 sm:py-0 border-b border-[#E3EAE0] bg-white px-3 sm:px-6 md:px-8 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 shrink-0 z-10 shadow-2xs">
         {/* Left: Back & Breadcrumb */}
         <div className="flex items-center gap-3">
           <button
@@ -348,88 +350,11 @@ export const ArticleEditorView: React.FC<ArticleEditorViewProps> = ({
           
           {/* A. COVER IMAGE CARD (Allows 1 image with live preview & replace) */}
           <div className="bg-white rounded-3xl p-5 border border-[#E3EAE0] shadow-sm">
-            <div className="flex items-center justify-between mb-3">
-              <label className="text-xs font-bold text-[#0F241D] flex items-center gap-1.5 uppercase tracking-wider">
-                <ImageIcon className="w-3.5 h-3.5 text-emerald-700" />
-                <span>Featured Cover Image</span>
-              </label>
-              {coverImage && (
-                <button
-                  type="button"
-                  onClick={() => setCoverImage("")}
-                  className="text-xs text-rose-600 hover:text-rose-700 font-semibold flex items-center gap-1 transition-colors"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Remove Image</span>
-                </button>
-              )}
-            </div>
-
-            {coverImage ? (
-              <div className="relative group rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 max-h-72 flex items-center justify-center">
-                <img
-                  src={coverImage}
-                  alt="Article Cover"
-                  className="w-full h-72 object-cover transition-opacity group-hover:opacity-90"
-                />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-3.5 py-2 rounded-xl bg-white/95 text-slate-800 text-xs font-bold flex items-center gap-1.5 shadow-md hover:bg-white"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    <span>Upload New</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowUrlModal(true)}
-                    className="px-3.5 py-2 rounded-xl bg-white/95 text-slate-800 text-xs font-bold flex items-center gap-1.5 shadow-md hover:bg-white"
-                  >
-                    <Link2 className="w-3.5 h-3.5" />
-                    <span>Change URL</span>
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="border-2 border-dashed border-[#D6E2D2] rounded-2xl p-6 text-center bg-[#F9FCF8] hover:bg-[#F2F8F0] transition-colors">
-                <div className="w-12 h-12 rounded-2xl bg-[#EEF5EB] text-[#0F241D] flex items-center justify-center mx-auto mb-3">
-                  <ImageIcon className="w-6 h-6 text-emerald-800" />
-                </div>
-                <h4 className="text-xs font-bold text-[#0F241D] mb-1">
-                  Add a Cover Image to this {singularName}
-                </h4>
-                <p className="text-[11px] text-slate-400 mb-4 max-w-sm mx-auto">
-                  Upload an image from your computer or paste an image URL. It will be served via the API.
-                </p>
-
-                <div className="flex flex-wrap items-center justify-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 rounded-xl bg-[#0F241D] hover:bg-[#1a3f32] text-white text-xs font-bold flex items-center gap-1.5 transition-colors shadow-xs"
-                  >
-                    <Upload className="w-3.5 h-3.5 text-[#B8F256]" />
-                    <span>Upload Image</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowUrlModal(true)}
-                    className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-1.5 border border-slate-200 transition-colors shadow-xs"
-                  >
-                    <Link2 className="w-3.5 h-3.5" />
-                    <span>Paste Image URL</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-              className="hidden"
+            <SingleImageUploader
+              value={coverImage}
+              onChange={(val) => setCoverImage(val)}
+              label={`Featured Cover Image for this ${singularName}`}
+              helperText={`Upload at most one cover photo or paste an image URL. Auto-compressed to WebP for high performance.`}
             />
           </div>
 
@@ -533,7 +458,7 @@ export const ArticleEditorView: React.FC<ArticleEditorViewProps> = ({
 
               {/* Formatting Toolbar (Only in Write tab) */}
               {activeTab === "write" && (
-                <div className="flex items-center gap-1 flex-wrap text-slate-700">
+                <div className="flex items-center gap-1 overflow-x-auto max-w-full pb-1 text-slate-700">
                   {/* Headings */}
                   <div className="flex items-center border-r border-slate-200 pr-1.5 mr-1 gap-0.5">
                     <button

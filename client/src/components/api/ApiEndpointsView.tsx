@@ -113,7 +113,7 @@ export const ApiEndpointsView: React.FC<ApiEndpointsViewProps> = ({
   };
 
   return (
-    <div className="p-6 md:p-8 flex flex-col min-h-full bg-white">
+    <div className="p-4 sm:p-6 md:p-8 flex flex-col min-h-full bg-white">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 mb-6 border-b border-slate-100">
         <div>
@@ -189,7 +189,7 @@ export const ApiEndpointsView: React.FC<ApiEndpointsViewProps> = ({
       {/* Interactive Request Bar */}
       <div className="p-4 rounded-2xl bg-[#0F241D] text-white border border-[#1A3F33] mb-6 shadow-md">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-[#1E4B3D]">
-          <div className="flex items-center gap-2 font-mono text-xs overflow-x-auto">
+          <div className="flex items-center gap-2 font-mono text-xs overflow-x-auto min-w-0 flex-1 max-w-full">
             <span className="px-2 py-1 rounded-md bg-[#B8F256] text-[#0F241D] font-bold text-[11px]">
               GET
             </span>
@@ -256,7 +256,7 @@ export const ApiEndpointsView: React.FC<ApiEndpointsViewProps> = ({
 
       {/* Response Panel */}
       <div className="flex-1 flex flex-col rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-        <div className="bg-[#FAFBF9] px-4 py-2.5 border-b border-slate-200 flex items-center justify-between text-xs font-semibold text-slate-600">
+        <div className="bg-[#FAFBF9] px-3 sm:px-4 py-2.5 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-slate-600">
           <div className="flex items-center gap-3">
             <span>Response Payload ({responseStatus} {responseStatus === 200 ? 'OK' : responseStatus === 201 ? 'Created' : 'Response'})</span>
             <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-mono font-bold">

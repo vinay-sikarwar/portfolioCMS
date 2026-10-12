@@ -48,12 +48,14 @@ import {
   Package,
   Key,
   BookOpen,
+  Menu,
 } from "lucide-react";
 import { ApiEndpointsView } from "./api/ApiEndpointsView";
 import { ApiKeysView } from "./api/ApiKeysView";
 import { ApiGuideView } from "./api/ApiGuideView";
 import { BrandLogo } from "./BrandLogo";
 import { ArticleEditorView, ArticleItemData } from "./ArticleEditorView";
+import { SingleImageUploader } from "./SingleImageUploader";
 import { apiUrl, API_BASE_URL } from "../lib/api";
 
 export type FieldType =
@@ -63,7 +65,8 @@ export type FieldType =
   | "select"
   | "number"
   | "url"
-  | "nested";
+  | "nested"
+  | "image";
 
 export interface SubFieldDefinition {
   id: string;
@@ -136,6 +139,14 @@ const INITIAL_SECTIONS: SectionDefinition[] = [
     icon: "file-text",
     type: "editor",
   },
+  {
+    id: "skills",
+    name: "Skills",
+    singularName: "Skill",
+    slug: "skills",
+    icon: "sparkles",
+    type: "normal",
+  },
 ];
 
 const INITIAL_FIELDS_BY_SECTION: Record<string, FieldDefinition[]> = {
@@ -174,6 +185,13 @@ const INITIAL_FIELDS_BY_SECTION: Record<string, FieldDefinition[]> = {
       placeholder: "Short overview of the project...",
     },
     {
+      id: "f_image",
+      key: "image",
+      label: "Project Image / Thumbnail",
+      type: "image",
+      placeholder: "Upload or paste project photo",
+    },
+    {
       id: "f_client_nested",
       key: "client_details",
       label: "Client Details",
@@ -208,6 +226,48 @@ const INITIAL_FIELDS_BY_SECTION: Record<string, FieldDefinition[]> = {
       label: "Project URL",
       type: "url",
       placeholder: "https://example.com",
+    },
+  ],
+  skills: [
+    {
+      id: "f_s_title",
+      key: "title",
+      label: "Skill / Tech Name",
+      type: "text",
+      required: true,
+      isSystem: true,
+      placeholder: "e.g. React, Node.js, GraphQL",
+    },
+    {
+      id: "f_s_category",
+      key: "category",
+      label: "Category",
+      type: "text",
+      required: true,
+      placeholder: "e.g. Frontend, Backend, Tools",
+    },
+    {
+      id: "f_s_status",
+      key: "status",
+      label: "Status",
+      type: "select",
+      required: true,
+      isSystem: true,
+      options: ["Live", "Draft", "Updated"],
+    },
+    {
+      id: "f_s_image",
+      key: "image",
+      label: "Skill Logo / Photo",
+      type: "image",
+      placeholder: "Upload skill logo or photo",
+    },
+    {
+      id: "f_s_summary",
+      key: "summary",
+      label: "Description / Proficiency",
+      type: "textarea",
+      placeholder: "Years of experience, key achievements, or stack notes...",
     },
   ],
   blog: [
@@ -565,6 +625,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   >("all");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Mobile drawer & tab state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mobileTab, setMobileTab] = useState<"content" | "api-info">("content");
+
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditFieldsModalOpen, setIsEditFieldsModalOpen] = useState(false);
@@ -909,8 +973,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             category: itemData.category || "General",
             status: targetStatus,
             summary: itemData.summary || "",
+            image: itemData.image || itemData.coverImage || undefined,
+            coverImage: itemData.coverImage || itemData.image || undefined,
             data: {
               ...itemData,
+              image: itemData.image || itemData.coverImage || undefined,
+              coverImage: itemData.coverImage || itemData.image || undefined,
               status: targetStatus,
             },
           }),
@@ -974,6 +1042,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         initialData[field.key] = "";
       }
     });
+    initialData.image = "";
+    initialData.coverImage = "";
     setNewItemFormData(initialData);
     setIsAddModalOpen(true);
   };
@@ -991,6 +1061,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
     if (currentUser?.apiSlug && token) {
       try {
+        const imageVal = newItemFormData.image || newItemFormData.coverImage || undefined;
         const res = await fetch(apiUrl(`/api/v1/${currentUser.apiSlug}/${activeSection.slug}`), {
           method: "POST",
           headers: {
@@ -1003,7 +1074,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             category: newItemFormData.category || "General",
             status: newItemFormData.status || "Live",
             summary: newItemFormData.summary || "",
-            data: newItemFormData,
+            image: imageVal,
+            coverImage: imageVal,
+            data: {
+              ...newItemFormData,
+              image: imageVal,
+              coverImage: imageVal,
+            },
           }),
         });
         if (res.ok) {
@@ -1304,14 +1381,41 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   };
 
   // Quick publish
-  const handlePublish = () => {
+  const handlePublish = async () => {
+    if (!activeItem) return;
     setIsPublishing(true);
-    setTimeout(() => {
-      setIsPublishing(false);
-      showToast(
-        "Live payload published! Cache refreshed across edge nodes in 38ms."
-      );
-    }, 700);
+    const token = localStorage.getItem("portfoliohq_token");
+    if (currentUser?.apiSlug && token) {
+      try {
+        const imageVal = activeItem.image || activeItem.coverImage || activeItem.photo || undefined;
+        await fetch(apiUrl(`/api/v1/${currentUser.apiSlug}/${activeSection.slug}/${activeItem.id}`), {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            title: activeItem.title,
+            slug: activeItem.slug,
+            category: activeItem.category || "General",
+            status: activeItem.status || "Live",
+            summary: activeItem.summary || "",
+            image: imageVal,
+            coverImage: imageVal,
+            data: {
+              ...activeItem,
+              image: imageVal,
+              coverImage: imageVal,
+            },
+          }),
+        });
+      } catch (err) {
+        console.error("Backend error updating item in Neon DB:", err);
+      }
+    }
+    persistItems(itemsBySection);
+    setIsPublishing(false);
+    showToast(`Published "${activeItem.title}" to Neon DB & Live API!`);
   };
 
   const toggleFormat = (format: string) => {
@@ -1489,20 +1593,46 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           </div>
         </aside>
 
-        {/* 2. SIDEBAR: CONTENT & ASSETS (Collection Navigation + "+" icon to add section) */}
-        <aside className="w-64 bg-[#FAFBF9] border-r border-[#E3EAE0] flex flex-col justify-between p-4 shrink-0 z-20">
+        {/* Mobile Drawer Overlay Backdrop */}
+        {isMobileMenuOpen && (
+          <div
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-0 bg-[#0F241D]/60 backdrop-blur-xs z-40 lg:hidden animate-in fade-in"
+          />
+        )}
+
+        {/* 2. SIDEBAR: CONTENT & ASSETS (Docked on desktop, slide drawer on mobile) */}
+        <aside
+          className={`
+            fixed inset-y-0 left-0 z-50 w-72 bg-[#FAFBF9] border-r border-[#E3EAE0] flex flex-col justify-between p-4 shadow-2xl transition-transform duration-200
+            lg:static lg:w-64 lg:shadow-none lg:translate-x-0 lg:z-20 lg:flex
+            ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
+          `}
+        >
           <div>
-            {/* Header Lockup - Clickable brand returning home */}
+            {/* Header Lockup - Clickable brand returning home with mobile close button */}
             <div className="flex items-center justify-between mb-4 px-1">
               <BrandLogo
-                onClick={onGoHome}
+                onClick={() => {
+                  onGoHome();
+                  setIsMobileMenuOpen(false);
+                }}
                 size="sm"
                 textClassName="text-base"
                 className="group cursor-pointer"
               />
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E5EFE2] text-[#0F241D]">
-                CMS v2
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#E5EFE2] text-[#0F241D]">
+                  CMS v2
+                </span>
+                <button
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 lg:hidden transition-colors"
+                  title="Close Navigation"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* API & DEVELOPER NAVIGATION (ACTIVE) */}
@@ -1512,7 +1642,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               </div>
               <div className="space-y-1 text-xs">
                 <button
-                  onClick={() => setActiveNav("api")}
+                  onClick={() => {
+                    setActiveNav("api");
+                    setIsMobileMenuOpen(false);
+                  }}
                   className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl transition-colors ${
                     activeNav === "api"
                       ? "bg-[#EEF5EB] text-[#0F241D] font-bold shadow-2xs border border-[#DCE8D8]"
@@ -1529,7 +1662,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 </button>
 
                 <button
-                  onClick={() => setActiveNav("apikeys")}
+                  onClick={() => {
+                    setActiveNav("apikeys");
+                    setIsMobileMenuOpen(false);
+                  }}
                   className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl transition-colors ${
                     activeNav === "apikeys"
                       ? "bg-[#EEF5EB] text-[#0F241D] font-bold shadow-2xs border border-[#DCE8D8]"
@@ -1546,7 +1682,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 </button>
 
                 <button
-                  onClick={() => setActiveNav("apiguide")}
+                  onClick={() => {
+                    setActiveNav("apiguide");
+                    setIsMobileMenuOpen(false);
+                  }}
                   className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl transition-colors ${
                     activeNav === "apiguide"
                       ? "bg-[#EEF5EB] text-[#0F241D] font-bold shadow-2xs border border-[#DCE8D8]"
@@ -1597,6 +1736,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       setActiveNav("content");
                       setActiveSectionId(sec.id);
                       setWorkspaceMode("list");
+                      setMobileTab("content");
+                      setIsMobileMenuOpen(false);
                     }}
                     className={`w-full flex items-center justify-between px-2.5 py-2 rounded-xl transition-colors ${
                       isSelected
@@ -1631,13 +1772,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 <span>Status</span>
               </div>
 
-              <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
                 {currentItems.map((item) => (
                   <div
                     key={item.id}
                     onClick={() => {
                       setActiveNav("content");
                       handleOpenEditor(item);
+                      setIsMobileMenuOpen(false);
                     }}
                     className={`flex items-center justify-between p-2 rounded-xl cursor-pointer transition-all ${
                       selectedItemId === item.id && workspaceMode === "editor"
@@ -1682,7 +1824,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           {/* Quick Return to Landing */}
           <div className="pt-3 border-t border-[#E3EAE0]">
             <button
-              onClick={onGoHome}
+              onClick={() => {
+                onGoHome();
+                setIsMobileMenuOpen(false);
+              }}
               className="w-full py-2 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 rounded-xl flex items-center justify-center gap-1.5 shadow-2xs transition-colors"
             >
               <ExternalLink className="w-3.5 h-3.5" />
@@ -1694,9 +1839,31 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         {/* 3. MAIN WORKSPACE VIEWPORT */}
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden bg-white">
           {/* Top Bar */}
-          <header className="h-14 border-b border-[#E8EDE6] px-4 md:px-6 flex items-center justify-between shrink-0 bg-white sticky top-0 z-10">
+          <header className="h-14 border-b border-[#E8EDE6] px-3 sm:px-4 md:px-6 flex items-center justify-between shrink-0 bg-white sticky top-0 z-10 gap-2">
+            {/* Mobile Hamburger Menu Toggle + Brand Indicator */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="lg:hidden p-2 rounded-xl text-slate-700 hover:bg-[#EEF5EB] border border-[#DEE8DB] transition-colors shadow-2xs"
+                title="Open Navigation Menu"
+              >
+                <Menu className="w-4 h-4 text-[#0F241D]" />
+              </button>
+              <div className="lg:hidden flex items-center gap-1.5">
+                <span className="text-xs font-extrabold text-[#0F241D] truncate max-w-[100px] sm:max-w-none">
+                  {activeNav === "api"
+                    ? "Endpoints"
+                    : activeNav === "apikeys"
+                    ? "API Keys"
+                    : activeNav === "apiguide"
+                    ? "Guide"
+                    : activeSection.name}
+                </span>
+              </div>
+            </div>
+
             {/* Search Input */}
-            <div className="flex-1 max-w-sm">
+            <div className="flex-1 max-w-xs sm:max-w-sm">
               <div className="relative">
                 <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -1710,7 +1877,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </div>
 
             {/* Right Tools & User Info */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <div className="hidden sm:flex items-center gap-1 p-0.5 bg-[#F1F5EE] rounded-lg border border-[#DCE4D9] text-xs">
                 <button
                   onClick={() => setWorkspaceMode("list")}
@@ -1738,23 +1905,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 </button>
               </div>
 
-              <button className="relative p-1.5 text-slate-400 hover:text-slate-700 rounded-full hover:bg-slate-100 transition-colors">
-                <Bell className="w-4 h-4" />
-                <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-[#B8F256] rounded-full ring-2 ring-white"></span>
-              </button>
-
-              <div className="flex items-center gap-2 pl-2 border-l border-slate-200">
-                <div className="w-7 h-7 rounded-full bg-[#0F241D] text-[#B8F256] text-xs font-bold flex items-center justify-center">
+              <div className="flex items-center gap-2 pl-1 sm:pl-2 sm:border-l sm:border-slate-200">
+                <div
+                  title={`Logged in as ${currentUser.name}`}
+                  className="w-7 h-7 rounded-full bg-[#0F241D] text-[#B8F256] text-xs font-bold flex items-center justify-center cursor-default shrink-0"
+                >
                   {currentUser.name.slice(0, 2).toUpperCase()}
                 </div>
                 <div className="hidden md:block">
-                  <span className="text-xs font-bold text-slate-900 block leading-tight">
+                  <span className="text-xs font-bold text-slate-900 block leading-tight truncate max-w-[120px]">
                     {currentUser.name}
                   </span>
-                  <span className="text-[10px] text-slate-400 block leading-tight">
+                  <span className="text-[10px] text-slate-400 block leading-tight truncate max-w-[120px]">
                     {currentUser.email}
                   </span>
                 </div>
+                <button
+                  onClick={onLogout}
+                  title="Log out"
+                  className="lg:hidden p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           </header>
@@ -1774,9 +1946,47 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               onSave={handleSaveArticle}
             />
           ) : (
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 min-h-0 overflow-hidden">
-              {/* CENTER COLUMN (8 cols) */}
-              <div className="lg:col-span-8 flex flex-col border-r border-[#E8EDE6] bg-white overflow-y-auto">
+            <div className="flex-1 flex flex-col lg:grid lg:grid-cols-12 min-h-0 overflow-hidden">
+              {/* Mobile Sub-tab switcher between Collection Items and API Status on <lg */}
+              {activeNav === "content" && workspaceMode === "list" && (
+                <div className="lg:hidden flex items-center border-b border-[#E8EDE6] bg-[#FAFBF9] px-3 sm:px-4 py-2 shrink-0">
+                  <div className="flex items-center gap-1 p-1 bg-[#EEF5EB] rounded-xl text-xs w-full">
+                    <button
+                      onClick={() => setMobileTab("content")}
+                      className={`flex-1 py-1.5 px-3 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
+                        mobileTab === "content"
+                          ? "bg-white text-[#0F241D] shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      <span>{activeSection.name}</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-[#B8F256] text-[#0F241D]">
+                        {filteredItems.length}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setMobileTab("api-info")}
+                      className={`flex-1 py-1.5 px-3 rounded-lg font-bold transition-all text-center flex items-center justify-center gap-1.5 ${
+                        mobileTab === "api-info"
+                          ? "bg-white text-[#0F241D] shadow-xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      }`}
+                    >
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span>API & Status</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* CENTER COLUMN (8 cols or 12 cols when API view) */}
+              <div
+                className={`flex flex-col border-r border-[#E8EDE6] bg-white overflow-y-auto flex-1 ${
+                  activeNav === "content" ? "lg:col-span-8" : "lg:col-span-12"
+                } ${
+                  mobileTab === "content" || activeNav !== "content" ? "flex" : "hidden lg:flex"
+                }`}
+              >
                 {activeNav === "api" ? (
                   <ApiEndpointsView
                     sections={sections}
@@ -1791,7 +2001,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 ) : activeNav === "apiguide" ? (
                   <ApiGuideView />
                 ) : workspaceMode === "list" ? (
-                  <div className="p-6 md:p-8 flex flex-col min-h-full">
+                  <div className="p-4 sm:p-6 md:p-8 flex flex-col min-h-full">
                     {/* Header with Title, Count, "Edit Fields", and "+ Add Item" */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 mb-6 border-b border-slate-100">
                       <div>
@@ -1811,7 +2021,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       </div>
 
                       {/* Action Controls: "Edit Fields" (Schema Builder) + "Delete Section" + "+" Add Item */}
-                      <div className="flex items-center gap-2.5 shrink-0">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
                         {/* Option to Edit Fields in that item (includes Nested Fields!) */}
                         <button
                           onClick={handleOpenEditFieldsModal}
@@ -1855,7 +2065,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
                   {/* FILTER BAR WITH 'JSON' BUTTON NEAR 'UPDATED' BUTTON (USER REQUEST) */}
                   <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-                    <div className="flex items-center gap-1.5 p-1 bg-[#F4F7F2] rounded-xl border border-[#E3EBE0] text-xs">
+                    <div className="flex items-center gap-1.5 p-1 bg-[#F4F7F2] rounded-xl border border-[#E3EBE0] text-xs overflow-x-auto max-w-full">
                       {/* Regular filter buttons */}
                       {(["all", "Live", "Draft", "Updated"] as const).map(
                         (filter) => (
@@ -2021,10 +2231,18 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                         >
                           {/* Item Left Info */}
                           <div className="flex items-start gap-3.5 min-w-0">
-                            <div className="w-10 h-10 rounded-xl bg-[#F4F8F1] border border-[#DEE8DB] flex items-center justify-center text-slate-800 shrink-0 group-hover:bg-[#EAF6E3] transition-colors">
-                              {renderSectionIcon(
-                                activeSection.icon,
-                                "w-5 h-5 text-[#0F241D]"
+                            <div className="w-10 h-10 rounded-xl bg-[#F4F8F1] border border-[#DEE8DB] overflow-hidden flex items-center justify-center text-slate-800 shrink-0 group-hover:bg-[#EAF6E3] transition-colors shadow-2xs">
+                              {item.image || item.coverImage || item.photo ? (
+                                <img
+                                  src={item.image || item.coverImage || item.photo}
+                                  alt={item.title}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                renderSectionIcon(
+                                  activeSection.icon,
+                                  "w-5 h-5 text-[#0F241D]"
+                                )
                               )}
                             </div>
 
@@ -2158,7 +2376,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 </div>
               ) : (
                 /* VIEW B: CONTENT EDITOR */
-                <div className="p-6 md:p-8 flex flex-col justify-between min-h-full">
+                <div className="p-4 sm:p-6 md:p-8 flex flex-col justify-between min-h-full">
                   <div>
                     {/* Breadcrumb / Back Button */}
                     <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
@@ -2193,7 +2411,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     </div>
 
                     {/* Rich Text Toolbar */}
-                    <div className="flex items-center gap-1 p-1 bg-[#F5F8F4] rounded-xl mb-4 border border-[#E4ECE1] text-slate-600">
+                    <div className="flex items-center gap-1 p-1 bg-[#F5F8F4] rounded-xl mb-4 border border-[#E4ECE1] text-slate-600 overflow-x-auto max-w-full">
                       <button
                         onClick={() => toggleFormat("bold")}
                         className={`p-1.5 rounded transition-colors font-bold text-xs ${
@@ -2238,9 +2456,69 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
                     {editorActiveView === "editor" && activeItem ? (
                       <div className="space-y-4">
+                        {/* Built-in Single Image / Photo Uploader (1 photo max) */}
+                        <div className="p-4 rounded-2xl bg-white border border-[#DEE8DB] shadow-xs">
+                          <SingleImageUploader
+                            value={activeItem.image || activeItem.coverImage || activeItem.photo || ""}
+                            onChange={(imgUrl) => {
+                              const next = {
+                                ...activeItem,
+                                image: imgUrl,
+                                coverImage: imgUrl,
+                                photo: imgUrl,
+                              };
+                              setItemsBySection((prev) => ({
+                                ...prev,
+                                [activeSectionId]: (prev[activeSectionId] || []).map((i) =>
+                                  i.id === activeItem.id ? next : i
+                                ),
+                                [activeSection.slug]: (prev[activeSection.slug] || []).map((i) =>
+                                  i.id === activeItem.id ? next : i
+                                ),
+                              }));
+                            }}
+                            label={`${activeSection.singularName} Image / Photo`}
+                            helperText={`Upload at most one photo for this ${activeSection.singularName.toLowerCase()}. Auto-compressed to WebP.`}
+                            compact
+                          />
+                        </div>
+
                         {/* Dynamic fields based on schema, including nested fields! */}
                         {currentFields.map((field) => {
                           const val = activeItem[field.key];
+
+                          // Skip redundant field if key is 'image' or 'coverImage' since handled above
+                          if (field.key === "image" || field.key === "coverImage") {
+                            return null;
+                          }
+
+                          // 0. CUSTOM IMAGE FIELD RENDERER
+                          if (field.type === "image") {
+                            return (
+                              <div key={field.id} className="p-4 rounded-2xl bg-[#F8FAF6] border border-[#DEE8DB]">
+                                <SingleImageUploader
+                                  value={val || ""}
+                                  onChange={(imgUrl) => {
+                                    const next = {
+                                      ...activeItem,
+                                      [field.key]: imgUrl,
+                                    };
+                                    setItemsBySection((prev) => ({
+                                      ...prev,
+                                      [activeSectionId]: (prev[activeSectionId] || []).map((i) =>
+                                        i.id === activeItem.id ? next : i
+                                      ),
+                                      [activeSection.slug]: (prev[activeSection.slug] || []).map((i) =>
+                                        i.id === activeItem.id ? next : i
+                                      ),
+                                    }));
+                                  }}
+                                  label={field.label}
+                                  compact
+                                />
+                              </div>
+                            );
+                          }
 
                           // 1. NESTED FIELD RENDERER IN EDITOR
                           if (field.type === "nested") {
@@ -2581,7 +2859,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </div>
 
             {/* RIGHT COLUMN (4 cols): API INTEGRATION & STATUS */}
-            <div className="lg:col-span-4 p-6 md:p-7 bg-[#FAFBF9] flex flex-col justify-between overflow-y-auto">
+            {activeNav === "content" && (
+              <div
+                className={`lg:col-span-4 p-4 sm:p-6 md:p-7 bg-[#FAFBF9] flex-col justify-between overflow-y-auto ${
+                  mobileTab === "api-info" ? "flex flex-1" : "hidden lg:flex"
+                }`}
+              >
               <div>
                 {/* Header */}
                 <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-200">
@@ -2730,6 +3013,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 </div>
               </div>
             </div>
+            )}
           </div>
         )}
       </div>
@@ -2741,8 +3025,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       {/* Handles both regular and nested object fields cleanly                */}
       {/* ==================================================================== */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F241D]/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 md:p-8 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#0F241D]/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full p-4 sm:p-6 md:p-8 shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
@@ -2771,7 +3055,50 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               onSubmit={handleSaveNewItem}
               className="flex-1 overflow-y-auto py-4 space-y-4 pr-1"
             >
+              {/* Single Image / Photo Uploader (1 photo max) */}
+              <div className="p-3.5 rounded-2xl bg-[#F6FAF3] border border-[#DEE8DB]">
+                <SingleImageUploader
+                  value={newItemFormData.image || newItemFormData.coverImage || ""}
+                  onChange={(imgUrl) => {
+                    setNewItemFormData({
+                      ...newItemFormData,
+                      image: imgUrl,
+                      coverImage: imgUrl,
+                      photo: imgUrl,
+                    });
+                  }}
+                  label={`${activeSection.singularName} Photo / Image`}
+                  helperText={`Upload at most one photo for this ${activeSection.singularName.toLowerCase()}. Auto-compressed to WebP.`}
+                  compact
+                />
+              </div>
+
               {currentFields.map((field) => {
+                // Skip redundant field if key is 'image' or 'coverImage' since handled above
+                if (field.key === "image" || field.key === "coverImage") {
+                  return null;
+                }
+
+                // Custom image field type
+                if (field.type === "image") {
+                  return (
+                    <div key={field.id} className="p-3.5 rounded-2xl bg-[#F6FAF3] border border-[#DEE8DB]">
+                      <SingleImageUploader
+                        value={newItemFormData[field.key] || newItemFormData.image || ""}
+                        onChange={(imgUrl) => {
+                          setNewItemFormData({
+                            ...newItemFormData,
+                            [field.key]: imgUrl,
+                            image: imgUrl,
+                          });
+                        }}
+                        label={field.label}
+                        compact
+                      />
+                    </div>
+                  );
+                }
+
                 // NESTED FIELDS IN ADD ITEM FORM
                 if (field.type === "nested") {
                   return (
@@ -2981,8 +3308,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       {/* (REQUEST: "allow to add nested fields if user want in edit fields")   */}
       {/* ==================================================================== */}
       {isEditFieldsModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F241D]/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-xl w-full p-6 md:p-8 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#0F241D]/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-xl w-full p-4 sm:p-6 md:p-8 shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
@@ -3168,6 +3495,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                         <option value="text">Text (Single line)</option>
                         <option value="textarea">Textarea (Multi-line)</option>
                         <option value="richtext">Rich Text / Markdown</option>
+                        <option value="image">Image / Photo (1 file max)</option>
                         <option value="number">Number</option>
                         <option value="url">URL / Link</option>
                         <option value="nested">
@@ -3309,8 +3637,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       {/*  section they want")                                                 */}
       {/* ==================================================================== */}
       {isAddSectionModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F241D]/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 md:p-8 shadow-2xl border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#0F241D]/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full p-4 sm:p-6 md:p-8 shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-2.5">

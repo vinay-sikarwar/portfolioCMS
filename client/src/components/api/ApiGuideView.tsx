@@ -122,7 +122,7 @@ else:
   };
 
   return (
-    <div className="p-6 md:p-8 flex flex-col min-h-full bg-white">
+    <div className="p-4 sm:p-6 md:p-8 flex flex-col min-h-full bg-white">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 mb-6 border-b border-slate-100">
         <div>
@@ -179,8 +179,8 @@ else:
       {/* Code Snippets Section */}
       <div className="flex-1 flex flex-col rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
         {/* Framework Tabs */}
-        <div className="bg-[#FAFBF9] px-4 py-2 border-b border-slate-200 flex items-center justify-between text-xs">
-          <div className="flex items-center gap-1.5 overflow-x-auto">
+        <div className="bg-[#FAFBF9] px-3 sm:px-4 py-2 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-1.5 overflow-x-auto min-w-0 pr-1">
             {(['nextjs', 'react', 'astro', 'curl', 'python'] as const).map((tab) => (
               <button
                 key={tab}

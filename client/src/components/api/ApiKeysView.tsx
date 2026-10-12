@@ -113,7 +113,7 @@ export const ApiKeysView: React.FC = () => {
   };
 
   return (
-    <div className="p-6 md:p-8 flex flex-col min-h-full bg-white">
+    <div className="p-4 sm:p-6 md:p-8 flex flex-col min-h-full bg-white">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 mb-6 border-b border-slate-100">
         <div>
@@ -245,8 +245,8 @@ export const ApiKeysView: React.FC = () => {
 
       {/* Modal: Generate New Key */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0F241D]/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#0F241D]/60 backdrop-blur-xs animate-in fade-in">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
               <h3 className="text-base font-extrabold text-[#0F241D]">
                 Generate New API Key
