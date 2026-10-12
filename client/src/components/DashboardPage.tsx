@@ -54,6 +54,7 @@ import { ApiKeysView } from "./api/ApiKeysView";
 import { ApiGuideView } from "./api/ApiGuideView";
 import { BrandLogo } from "./BrandLogo";
 import { ArticleEditorView, ArticleItemData } from "./ArticleEditorView";
+import { apiUrl, API_BASE_URL } from "../lib/api";
 
 export type FieldType =
   | "text"
@@ -488,7 +489,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         const headers = { Authorization: `Bearer ${token}` };
 
         // 1. Fetch user sections from Neon DB
-        const secRes = await fetch(`/api/v1/${currentUser.apiSlug}/sections`, { headers });
+        const secRes = await fetch(apiUrl(`/api/v1/${currentUser.apiSlug}/sections`), { headers });
         let activeSectionsList: SectionDefinition[] = sections;
         if (secRes.ok) {
           const secJson = await secRes.json();
@@ -529,7 +530,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         // 2. Load items dynamically for ALL sections from Neon DB
         for (const sec of activeSectionsList) {
           try {
-            const customRes = await fetch(`/api/v1/${currentUser.apiSlug}/${sec.slug}`, { headers });
+            const customRes = await fetch(apiUrl(`/api/v1/${currentUser.apiSlug}/${sec.slug}`), { headers });
             if (customRes.ok) {
               const customData = await customRes.json();
               if (Array.isArray(customData.data)) {
@@ -606,7 +607,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const [editorActiveView, setEditorActiveView] = useState<"editor" | "json">(
     "editor"
   );
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+  const apiBaseUrl = API_BASE_URL || window.location.origin;
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -798,7 +799,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     const token = localStorage.getItem("portfoliohq_token");
     if (currentUser?.apiSlug && token) {
       try {
-        const res = await fetch(`/api/v1/${currentUser.apiSlug}/sections`, {
+        const res = await fetch(apiUrl(`/api/v1/${currentUser.apiSlug}/sections`), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -892,9 +893,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     if (currentUser?.apiSlug && token) {
       try {
         const method = isNew ? "POST" : "PUT";
-        const url = isNew
+        const url = apiUrl(isNew
           ? `/api/v1/${currentUser.apiSlug}/${activeSection.slug}`
-          : `/api/v1/${currentUser.apiSlug}/${activeSection.slug}/${itemData.id}`;
+          : `/api/v1/${currentUser.apiSlug}/${activeSection.slug}/${itemData.id}`);
 
         const res = await fetch(url, {
           method,
@@ -990,7 +991,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
     if (currentUser?.apiSlug && token) {
       try {
-        const res = await fetch(`/api/v1/${currentUser.apiSlug}/${activeSection.slug}`, {
+        const res = await fetch(apiUrl(`/api/v1/${currentUser.apiSlug}/${activeSection.slug}`), {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1198,7 +1199,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     const token = localStorage.getItem("portfoliohq_token");
     if (currentUser?.apiSlug && token && activeSection.id) {
       try {
-        await fetch(`/api/v1/${currentUser.apiSlug}/sections/${activeSection.id}`, {
+        await fetch(apiUrl(`/api/v1/${currentUser.apiSlug}/sections/${activeSection.id}`), {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -1239,7 +1240,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     const token = localStorage.getItem("portfoliohq_token");
     if (currentUser?.apiSlug && token) {
       try {
-        await fetch(`/api/v1/${currentUser.apiSlug}/${activeSection.slug}/${id}`, {
+        await fetch(apiUrl(`/api/v1/${currentUser.apiSlug}/${activeSection.slug}/${id}`), {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -1264,7 +1265,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     const token = localStorage.getItem("portfoliohq_token");
     if (currentUser?.apiSlug && token && secToDelete.id) {
       try {
-        await fetch(`/api/v1/${currentUser.apiSlug}/sections/${secToDelete.id}`, {
+        await fetch(apiUrl(`/api/v1/${currentUser.apiSlug}/sections/${secToDelete.id}`), {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
         });

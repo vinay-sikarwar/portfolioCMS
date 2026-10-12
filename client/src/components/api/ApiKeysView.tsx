@@ -13,6 +13,7 @@ import {
   RotateCw,
   X
 } from 'lucide-react';
+import { apiUrl } from '../../lib/api';
 
 interface ApiKeyItem {
   id: string;
@@ -41,12 +42,12 @@ export const ApiKeysView: React.FC = () => {
 
   useEffect(() => {
     const loadKeys = async () => {
-      const sessionResponse = await fetch('/api/auth/me', { headers: getAuthHeaders() });
+      const sessionResponse = await fetch(apiUrl('/api/auth/me'), { headers: getAuthHeaders() });
       const sessionPayload = await sessionResponse.json();
       if (!sessionResponse.ok || !sessionPayload.user?.apiSlug) return;
       setApiSlug(sessionPayload.user.apiSlug);
 
-      const response = await fetch(`/api/v1/${sessionPayload.user.apiSlug}/keys`, { headers: getAuthHeaders() });
+      const response = await fetch(apiUrl(`/api/v1/${sessionPayload.user.apiSlug}/keys`), { headers: getAuthHeaders() });
       const payload = await response.json();
       {
         if (!payload.data) return;
@@ -77,7 +78,7 @@ export const ApiKeysView: React.FC = () => {
     if (!newKeyName.trim()) return;
 
     if (!apiSlug) return;
-    const response = await fetch(`/api/v1/${apiSlug}/keys`, {
+    const response = await fetch(apiUrl(`/api/v1/${apiSlug}/keys`), {
       method: 'POST',
       headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: newKeyName.trim(), role: newKeyRole }),
@@ -102,7 +103,7 @@ export const ApiKeysView: React.FC = () => {
 
   const handleRevokeKey = async (id: string) => {
     if (!apiSlug) return;
-    const response = await fetch(`/api/v1/${apiSlug}/keys/${id}`, {
+    const response = await fetch(apiUrl(`/api/v1/${apiSlug}/keys/${id}`), {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });

@@ -15,6 +15,7 @@ import {
   Layers
 } from 'lucide-react';
 import { SectionDefinition, ItemData } from '../DashboardPage';
+import { apiUrl, API_BASE_URL } from '../../lib/api';
 
 interface ApiEndpointsViewProps {
   sections: SectionDefinition[];
@@ -41,14 +42,14 @@ export const ApiEndpointsView: React.FC<ApiEndpointsViewProps> = ({
   const [copied, setCopied] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [latencyMs, setLatencyMs] = useState(24);
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || window.location.origin;
+  const apiBaseUrl = API_BASE_URL || window.location.origin;
   const [apiSlug, setApiSlug] = useState<string | null>(null);
   const [liveResponse, setLiveResponse] = useState<any>(null);
   const [responseStatus, setResponseStatus] = useState<number>(200);
 
   useEffect(() => {
     const token = localStorage.getItem('portfoliohq_token');
-    fetch('/api/auth/me', { headers: { Authorization: `Bearer ${token || ''}` } })
+    fetch(apiUrl('/api/auth/me'), { headers: { Authorization: `Bearer ${token || ''}` } })
       .then((response) => response.json())
       .then((payload) => setApiSlug(payload.user?.apiSlug || null))
       .catch(() => undefined);
@@ -93,7 +94,7 @@ export const ApiEndpointsView: React.FC<ApiEndpointsViewProps> = ({
     const startTime = performance.now();
     try {
       const testPath = `/api/v1/${apiSlug || 'your-api-slug'}/${selectedEndpointSlug}${queryString}`;
-      const res = await fetch(testPath, {
+      const res = await fetch(apiUrl(testPath), {
         headers: {
           Authorization: `Bearer ${token || ''}`,
         },

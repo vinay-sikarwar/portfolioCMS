@@ -14,6 +14,7 @@ import { Footer } from './components/Footer';
 import { DemoModal } from './components/DemoModal';
 import { AuthPage } from './components/AuthPage';
 import { DashboardPage } from './components/DashboardPage';
+import { safeFetchJson } from './lib/api';
 
 interface UserSession {
   name: string;
@@ -61,16 +62,13 @@ export default function App() {
       try {
         const token = localStorage.getItem('portfoliohq_token');
         if (token) {
-          const res = await fetch('/api/auth/me', {
+          const { ok, data } = await safeFetchJson('/api/auth/me', {
             headers: { Authorization: `Bearer ${token}` },
           });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.user) {
-              setCurrentUser(data.user);
-              localStorage.setItem('portfoliohq_user', JSON.stringify(data.user));
-              return;
-            }
+          if (ok && data?.user) {
+            setCurrentUser(data.user);
+            localStorage.setItem('portfoliohq_user', JSON.stringify(data.user));
+            return;
           }
         }
         const stored = localStorage.getItem('portfoliohq_user');

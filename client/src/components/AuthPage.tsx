@@ -21,6 +21,7 @@ import {
   createUserWithEmailAndPassword,
   updateProfile,
 } from "../lib/firebase";
+import { safeFetchJson } from "../lib/api";
 
 interface AuthPageProps {
   initialMode?: "login" | "signup";
@@ -81,7 +82,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         cleanName
       )}`;
 
-    const response = await fetch("/api/auth/firebase-sync", {
+    const { ok, data } = await safeFetchJson("/api/auth/firebase-sync", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -97,9 +98,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       }),
     });
 
-    const data = await response.json();
-    if (!response.ok || !data.success) {
-      throw new Error(data.error || "Failed to sync user with Prisma database");
+    if (!ok || !data.success) {
+      throw new Error(data?.error || "Failed to sync user with Prisma database");
     }
 
     if (data.token) {
