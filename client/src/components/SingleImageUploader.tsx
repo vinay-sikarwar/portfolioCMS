@@ -24,7 +24,7 @@ export const SingleImageUploader: React.FC<SingleImageUploaderProps> = ({
   value,
   onChange,
   label = "Featured Image / Photo",
-  helperText = "Upload at most one image (max 1 photo per item). Auto-optimized for instant API loading.",
+  helperText = "Upload image or paste image URL. Auto-optimized for instant API loading.",
   className = "",
   compact = false,
 }) => {
@@ -96,9 +96,6 @@ export const SingleImageUploader: React.FC<SingleImageUploaderProps> = ({
         <label className="text-xs font-bold text-[#0F241D] flex items-center gap-1.5 uppercase tracking-wider">
           <ImageIcon className="w-3.5 h-3.5 text-emerald-700" />
           <span>{label}</span>
-          <span className="text-[10px] lowercase font-normal text-slate-400">
-            (1 photo max)
-          </span>
         </label>
 
         {value && (
@@ -199,7 +196,7 @@ export const SingleImageUploader: React.FC<SingleImageUploaderProps> = ({
               </div>
 
               <p className="text-xs font-bold text-[#0F241D] mb-0.5">
-                Upload 1 photo or paste image URL
+                Upload photo or paste image URL
               </p>
               <p className="text-[11px] text-slate-400 mb-3 max-w-xs mx-auto">
                 {helperText}

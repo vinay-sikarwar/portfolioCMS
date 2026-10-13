@@ -525,7 +525,26 @@ app.get("/api/v1/:apiSlug/sections", async (req: Request, res: Response) => {
       });
     }
 
-    res.json({ status: 200, count: sections.length, data: sections });
+    const mapped = sections.map((s) => {
+      let fieldsArr = [];
+      try {
+        fieldsArr = typeof s.fields === "string" ? JSON.parse(s.fields) : (s.fields || []);
+      } catch {}
+      const isEditor =
+        s.slug === "posts" ||
+        s.slug === "blog" ||
+        (Array.isArray(fieldsArr) &&
+          fieldsArr.some(
+            (f: any) =>
+              f.type === "richtext" || f.key === "body" || f.key === "content"
+          ));
+      return {
+        ...s,
+        type: isEditor ? "editor" : "normal",
+      };
+    });
+
+    res.json({ status: 200, count: mapped.length, data: mapped });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -534,7 +553,7 @@ app.get("/api/v1/:apiSlug/sections", async (req: Request, res: Response) => {
 app.post("/api/v1/:apiSlug/sections", async (req: Request, res: Response) => {
   try {
     if (!requireWriteAccess(req, res)) return;
-    const { name, singularName, slug, icon, description, fields } = req.body;
+    const { name, singularName, slug, icon, description, fields, type } = req.body;
     if (!name?.trim()) {
       res.status(400).json({ error: "Section name is required" });
       return;
@@ -570,7 +589,26 @@ app.post("/api/v1/:apiSlug/sections", async (req: Request, res: Response) => {
       },
     });
 
-    res.status(201).json({ status: 201, data: section });
+    let parsedFieldsArr: any[] = [];
+    try {
+      parsedFieldsArr = typeof section.fields === "string" ? JSON.parse(section.fields) : (section.fields as any || []);
+    } catch {}
+    const isEditor =
+      type === "editor" ||
+      cleanSlug === "posts" ||
+      (Array.isArray(parsedFieldsArr) &&
+        parsedFieldsArr.some(
+          (f: any) =>
+            f.type === "richtext" || f.key === "body" || f.key === "content"
+        ));
+
+    res.status(201).json({
+      status: 201,
+      data: {
+        ...section,
+        type: isEditor ? "editor" : "normal",
+      },
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -635,7 +673,20 @@ app.put("/api/v1/:apiSlug/sections/:id", async (req: Request, res: Response) => 
       },
     });
 
-    res.json({ status: 200, data: section });
+    let updatedFieldsArr: any[] = [];
+    try {
+      updatedFieldsArr = typeof section.fields === "string" ? JSON.parse(section.fields) : (section.fields as any || []);
+    } catch {}
+    const isEditor =
+      section.slug === "posts" ||
+      section.slug === "blog" ||
+      (Array.isArray(updatedFieldsArr) &&
+        updatedFieldsArr.some(
+          (f: any) =>
+            f.type === "richtext" || f.key === "body" || f.key === "content"
+        ));
+
+    res.json({ status: 200, data: { ...section, type: isEditor ? "editor" : "normal" } });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }

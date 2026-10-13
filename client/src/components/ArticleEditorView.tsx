@@ -26,8 +26,39 @@ import {
   Tag,
   Clock,
   FileText,
+  SlidersHorizontal,
+  CornerDownRight,
 } from "lucide-react";
 import { SingleImageUploader } from "./SingleImageUploader";
+
+export interface SubFieldDefinition {
+  id: string;
+  key: string;
+  label: string;
+  type: "text" | "number" | "url" | "textarea";
+  placeholder?: string;
+  required?: boolean;
+}
+
+export interface FieldDefinition {
+  id: string;
+  key: string;
+  label: string;
+  type:
+    | "text"
+    | "number"
+    | "url"
+    | "textarea"
+    | "richtext"
+    | "select"
+    | "image"
+    | "nested";
+  required?: boolean;
+  isSystem?: boolean;
+  options?: string[];
+  placeholder?: string;
+  subFields?: SubFieldDefinition[];
+}
 
 export interface ArticleItemData {
   id: string;
@@ -51,6 +82,7 @@ interface ArticleEditorViewProps {
   onSave: (data: ArticleItemData, status: "Draft" | "Live") => Promise<void> | void;
   onCancel: () => void;
   currentUser: { name: string; email: string };
+  customFields?: FieldDefinition[];
 }
 
 export const ArticleEditorView: React.FC<ArticleEditorViewProps> = ({
@@ -61,6 +93,7 @@ export const ArticleEditorView: React.FC<ArticleEditorViewProps> = ({
   onSave,
   onCancel,
   currentUser,
+  customFields = [],
 }) => {
   const [title, setTitle] = useState(initialItem?.title || "");
   const [slug, setSlug] = useState(initialItem?.slug || "");
@@ -78,6 +111,62 @@ export const ArticleEditorView: React.FC<ArticleEditorViewProps> = ({
   const [content, setContent] = useState(
     initialItem?.content || initialItem?.body || ""
   );
+
+  // Dynamic schema fields state
+  const [customData, setCustomData] = useState<Record<string, any>>(() => {
+    const initial: Record<string, any> = {};
+    if (customFields && Array.isArray(customFields)) {
+      customFields.forEach((field) => {
+        if (field.type === "nested") {
+          const existingNested = initialItem?.[field.key] || {};
+          initial[field.key] = {};
+          field.subFields?.forEach((sf) => {
+            initial[field.key][sf.key] = existingNested[sf.key] !== undefined ? existingNested[sf.key] : "";
+          });
+        } else if (initialItem && initialItem[field.key] !== undefined) {
+          initial[field.key] = initialItem[field.key];
+        } else if (field.key === "author") {
+          initial[field.key] = currentUser.name;
+        } else {
+          initial[field.key] = "";
+        }
+      });
+    }
+    if (initialItem) {
+      Object.keys(initialItem).forEach((k) => {
+        if (
+          initial[k] === undefined &&
+          !["title", "slug", "coverImage", "image", "content", "body", "summary", "category", "status", "id", "updatedAt"].includes(k)
+        ) {
+          initial[k] = initialItem[k];
+        }
+      });
+    }
+    return initial;
+  });
+
+  const handleCustomFieldChange = (key: string, value: any) => {
+    setCustomData((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const handleNestedFieldChange = (parentKey: string, subKey: string, value: any) => {
+    setCustomData((prev) => {
+      const parentObj =
+        prev[parentKey] && typeof prev[parentKey] === "object"
+          ? prev[parentKey]
+          : {};
+      return {
+        ...prev,
+        [parentKey]: {
+          ...parentObj,
+          [subKey]: value,
+        },
+      };
+    });
+  };
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write");
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -179,6 +268,7 @@ export const ArticleEditorView: React.FC<ArticleEditorViewProps> = ({
 
     setIsSaving(true);
     const itemPayload: ArticleItemData = {
+      ...customData,
       id: initialItem?.id || `${sectionSlug}_${Date.now()}`,
       title: title.trim(),
       slug: slug.trim() || undefined,
@@ -189,7 +279,7 @@ export const ArticleEditorView: React.FC<ArticleEditorViewProps> = ({
       summary: summary.trim(),
       category: category.trim() || "General",
       status: targetStatus,
-      author: initialItem?.author || currentUser.name,
+      author: customData.author || initialItem?.author || currentUser.name,
       updatedAt: "Just now",
     };
 
@@ -354,7 +444,7 @@ export const ArticleEditorView: React.FC<ArticleEditorViewProps> = ({
               value={coverImage}
               onChange={(val) => setCoverImage(val)}
               label={`Featured Cover Image for this ${singularName}`}
-              helperText={`Upload at most one cover photo or paste an image URL. Auto-compressed to WebP for high performance.`}
+              helperText={`Upload cover photo or paste an image URL. Auto-compressed to WebP for high performance.`}
             />
           </div>
 
@@ -423,6 +513,259 @@ export const ArticleEditorView: React.FC<ArticleEditorViewProps> = ({
               />
             </div>
           </div>
+
+          {/* B2. CUSTOM / SCHEMA FIELDS DEFINED VIA EDIT FIELDS */}
+          {(() => {
+            const STANDARD_KEYS = new Set([
+              "title",
+              "slug",
+              "coverImage",
+              "image",
+              "content",
+              "body",
+              "summary",
+              "category",
+              "status",
+            ]);
+            const relevantCustomFields = (customFields || []).filter(
+              (f) => !STANDARD_KEYS.has(f.key)
+            );
+
+            if (relevantCustomFields.length === 0) return null;
+
+            return (
+              <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#E3EAE0] shadow-sm space-y-5">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <SlidersHorizontal className="w-4 h-4 text-[#0F241D]" />
+                    <h3 className="text-sm font-extrabold text-[#0F241D]">
+                      Additional {singularName} Fields & Attributes
+                    </h3>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    {relevantCustomFields.length} configured field
+                    {relevantCustomFields.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {relevantCustomFields.map((field) => {
+                    // 1. NESTED FIELD
+                    if (field.type === "nested") {
+                      const nestedObj =
+                        customData[field.key] &&
+                        typeof customData[field.key] === "object"
+                          ? customData[field.key]
+                          : {};
+                      return (
+                        <div
+                          key={field.id}
+                          className="sm:col-span-2 p-4 rounded-2xl bg-[#F6FAF3] border border-[#DEE8DB] space-y-3"
+                        >
+                          <div className="flex items-center justify-between pb-2 border-b border-[#E3EDE0]">
+                            <div className="flex items-center gap-1.5">
+                              <CornerDownRight className="w-3.5 h-3.5 text-[#0F241D]" />
+                              <label className="text-xs font-bold text-[#0F241D]">
+                                {field.label}{" "}
+                                <span className="text-[10px] text-slate-400 font-mono">
+                                  ({field.key})
+                                </span>
+                              </label>
+                            </div>
+                            <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded">
+                              Nested Object
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {field.subFields && field.subFields.length > 0 ? (
+                              field.subFields.map((sf) => (
+                                <div
+                                  key={sf.id}
+                                  className={
+                                    sf.type === "textarea"
+                                      ? "sm:col-span-2"
+                                      : ""
+                                  }
+                                >
+                                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                                    {sf.label}{" "}
+                                    {sf.required && (
+                                      <span className="text-rose-500">*</span>
+                                    )}
+                                  </label>
+                                  {sf.type === "textarea" ? (
+                                    <textarea
+                                      rows={2}
+                                      value={nestedObj[sf.key] || ""}
+                                      onChange={(e) =>
+                                        handleNestedFieldChange(
+                                          field.key,
+                                          sf.key,
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder={
+                                        sf.placeholder ||
+                                        `Enter ${sf.label.toLowerCase()}...`
+                                      }
+                                      className="w-full p-2.5 bg-white rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
+                                    />
+                                  ) : (
+                                    <input
+                                      type={
+                                        sf.type === "number"
+                                          ? "number"
+                                          : sf.type === "url"
+                                          ? "url"
+                                          : "text"
+                                      }
+                                      value={nestedObj[sf.key] || ""}
+                                      onChange={(e) =>
+                                        handleNestedFieldChange(
+                                          field.key,
+                                          sf.key,
+                                          e.target.value
+                                        )
+                                      }
+                                      placeholder={
+                                        sf.placeholder ||
+                                        `Enter ${sf.label.toLowerCase()}...`
+                                      }
+                                      className="w-full p-2.5 bg-white rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
+                                    />
+                                  )}
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-xs text-slate-400 italic sm:col-span-2">
+                                No sub-fields configured for this nested group.
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    // 2. IMAGE FIELD
+                    if (field.type === "image") {
+                      return (
+                        <div key={field.id} className="sm:col-span-2">
+                          <SingleImageUploader
+                            value={customData[field.key] || ""}
+                            onChange={(val) =>
+                              handleCustomFieldChange(field.key, val)
+                            }
+                            label={field.label}
+                            compact
+                          />
+                        </div>
+                      );
+                    }
+
+                    // 3. SELECT FIELD
+                    if (field.type === "select") {
+                      return (
+                        <div key={field.id}>
+                          <label className="block text-xs font-bold text-slate-700 mb-1">
+                            {field.label}{" "}
+                            {field.required && (
+                              <span className="text-rose-500">*</span>
+                            )}
+                          </label>
+                          <select
+                            value={
+                              customData[field.key] ||
+                              field.options?.[0] ||
+                              ""
+                            }
+                            onChange={(e) =>
+                              handleCustomFieldChange(
+                                field.key,
+                                e.target.value
+                              )
+                            }
+                            className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:border-[#0F241D]"
+                          >
+                            {field.options?.map((opt) => (
+                              <option key={opt} value={opt}>
+                                {opt}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      );
+                    }
+
+                    // 4. TEXTAREA / RICHTEXT
+                    if (
+                      field.type === "textarea" ||
+                      field.type === "richtext"
+                    ) {
+                      return (
+                        <div key={field.id} className="sm:col-span-2">
+                          <label className="block text-xs font-bold text-slate-700 mb-1">
+                            {field.label}{" "}
+                            {field.required && (
+                              <span className="text-rose-500">*</span>
+                            )}
+                          </label>
+                          <textarea
+                            rows={3}
+                            value={customData[field.key] || ""}
+                            onChange={(e) =>
+                              handleCustomFieldChange(
+                                field.key,
+                                e.target.value
+                              )
+                            }
+                            placeholder={
+                              field.placeholder ||
+                              `Enter ${field.label.toLowerCase()}...`
+                            }
+                            className="w-full p-3 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
+                          />
+                        </div>
+                      );
+                    }
+
+                    // 5. REGULAR INPUT (text, number, url)
+                    return (
+                      <div key={field.id}>
+                        <label className="block text-xs font-bold text-slate-700 mb-1">
+                          {field.label}{" "}
+                          {field.required && (
+                            <span className="text-rose-500">*</span>
+                          )}
+                        </label>
+                        <input
+                          type={
+                            field.type === "number"
+                              ? "number"
+                              : field.type === "url"
+                              ? "url"
+                              : "text"
+                          }
+                          value={customData[field.key] || ""}
+                          onChange={(e) =>
+                            handleCustomFieldChange(
+                              field.key,
+                              e.target.value
+                            )
+                          }
+                          placeholder={
+                            field.placeholder ||
+                            `Enter ${field.label.toLowerCase()}...`
+                          }
+                          className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* C. RICH TEXT CONTENT & STYLES EDITOR */}
           <div className="bg-white rounded-3xl border border-[#E3EAE0] shadow-sm overflow-hidden flex flex-col">

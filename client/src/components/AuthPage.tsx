@@ -25,6 +25,7 @@ interface AuthPageProps {
   initialMode?: "login" | "signup";
   selectedPlan?: string;
   onBack: () => void;
+  onModeChange?: (mode: "login" | "signup") => void;
   onSuccess: (userData: {
     id?: string;
     name: string;
@@ -40,6 +41,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   initialMode = "login",
   selectedPlan = "Pro",
   onBack,
+  onModeChange,
   onSuccess,
 }) => {
   const [mode, setMode] = useState<"login" | "signup">(initialMode);
@@ -53,12 +55,23 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
   const [resetSent, setResetSent] = useState(false);
 
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
+  const handleModeChange = (newMode: "login" | "signup") => {
+    setMode(newMode);
+    setError(null);
+    onModeChange?.(newMode);
+    if (typeof window !== "undefined") {
+      window.history.replaceState({}, "", newMode === "signup" ? "/signup" : "/login");
+    }
+  };
+
   // Google Modal state (for fast 1-click sign in)
   const [googleModalOpen, setGoogleModalOpen] = useState(false);
-  const [googleEmailInput, setGoogleEmailInput] = useState(
-    "vinaysikarwar199@gmail.com"
-  );
-  const [googleNameInput, setGoogleNameInput] = useState("Vinay Sikarwar");
+  const [googleEmailInput, setGoogleEmailInput] = useState("");
+  const [googleNameInput, setGoogleNameInput] = useState("");
 
   // Synchronize Firebase user to Prisma ORM database
   const syncWithPrismaDatabase = async (firebaseUser: {
@@ -402,10 +415,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <div className="inline-flex p-1 bg-[#F1F5EE] rounded-full border border-[#DCE4D9]">
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode("login");
-                    setError(null);
-                  }}
+                  onClick={() => handleModeChange("login")}
                   className={`px-3 py-1 text-xs font-bold rounded-full transition-all cursor-pointer ${
                     mode === "login"
                       ? "bg-[#0F241D] text-white shadow-xs"
@@ -416,10 +426,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setMode("signup");
-                    setError(null);
-                  }}
+                  onClick={() => handleModeChange("signup")}
                   className={`px-3 py-1 text-xs font-bold rounded-full transition-all cursor-pointer ${
                     mode === "signup"
                       ? "bg-[#0F241D] text-white shadow-xs"
@@ -507,7 +514,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="vinaysikarwar199@gmail.com"
+                    placeholder="name@example.com"
                     required
                     className="w-full pl-10 pr-4 py-2.5 bg-[#F9FAF8] border border-[#DCE4D9] rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0F241D] focus:bg-white transition-all"
                   />
@@ -606,10 +613,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <span>
                   Don't have an account yet?{" "}
                   <button
-                    onClick={() => {
-                      setMode("signup");
-                      setError(null);
-                    }}
+                    onClick={() => handleModeChange("signup")}
                     className="font-bold text-[#0F241D] hover:underline cursor-pointer"
                   >
                     Sign up for free
@@ -619,10 +623,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <span>
                   Already registered?{" "}
                   <button
-                    onClick={() => {
-                      setMode("login");
-                      setError(null);
-                    }}
+                    onClick={() => handleModeChange("login")}
                     className="font-bold text-[#0F241D] hover:underline cursor-pointer"
                   >
                     Sign in here
@@ -675,42 +676,6 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             </div>
 
             <div className="space-y-4">
-              {/* 1-Click User Profile */}
-              <div
-                onClick={() =>
-                  handleCustomGoogleSubmit(
-                    "vinaysikarwar199@gmail.com",
-                    "Vinay Sikarwar"
-                  )
-                }
-                className="p-3.5 rounded-2xl border border-emerald-200 bg-[#F4F9F2] hover:bg-[#EAF5E5] cursor-pointer transition-all flex items-center justify-between group"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-[#0F241D] text-[#B8F256] font-bold text-xs flex items-center justify-center">
-                    VS
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-[#0F241D] block">
-                      Vinay Sikarwar
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-medium">
-                      vinaysikarwar199@gmail.com
-                    </span>
-                  </div>
-                </div>
-
-                <div className="px-2.5 py-1 rounded-full bg-[#0F241D] text-[#B8F256] text-[10px] font-bold group-hover:scale-105 transition-transform">
-                  1-Click Sign In
-                </div>
-              </div>
-
-              <div className="relative flex items-center justify-center my-2">
-                <div className="border-t border-slate-200 w-full"></div>
-                <span className="bg-white px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider absolute">
-                  or sign in with another email
-                </span>
-              </div>
-
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   Google Email

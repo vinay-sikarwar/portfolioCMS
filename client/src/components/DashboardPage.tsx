@@ -555,14 +555,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         if (secRes.ok) {
           const secJson = await secRes.json();
           if (Array.isArray(secJson.data) && secJson.data.length > 0) {
-            const dbSecs: SectionDefinition[] = secJson.data.map((s: any) => ({
-              id: s.id,
-              name: s.name,
-              singularName: s.singularName,
-              slug: s.slug,
-              icon: s.icon || "layers",
-              description: s.description || "",
-            }));
+            const dbSecs: SectionDefinition[] = secJson.data.map((s: any) => {
+              let parsedFields: any[] = [];
+              try {
+                parsedFields = typeof s.fields === "string" ? JSON.parse(s.fields) : (s.fields || []);
+              } catch {}
+              const isEditor =
+                s.type === "editor" ||
+                s.slug === "posts" ||
+                s.id === "blog" ||
+                (Array.isArray(parsedFields) &&
+                  parsedFields.some(
+                    (f: any) =>
+                      f.type === "richtext" || f.key === "body" || f.key === "content"
+                  ));
+              return {
+                id: s.id,
+                name: s.name,
+                singularName: s.singularName,
+                slug: s.slug,
+                icon: s.icon || (isEditor ? "file-text" : "layers"),
+                description: s.description || "",
+                type: isEditor ? ("editor" as const) : ("normal" as const),
+              };
+            });
 
             // Sync schema fields if present
             secJson.data.forEach((s: any) => {
@@ -735,6 +751,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     });
   };
 
+  // Helper to reliably detect if a section is a full-page rich text / article editor collection
+  const isEditorSection = (sec?: SectionDefinition | null) => {
+    if (!sec) return false;
+    if (sec.type === "editor") return true;
+    if (sec.slug === "posts" || sec.slug === "blog" || sec.id === "blog") return true;
+    const fields =
+      fieldsBySection[sec.id] ||
+      fieldsBySection[sec.slug] ||
+      INITIAL_FIELDS_BY_SECTION[sec.slug] ||
+      [];
+    return fields.some(
+      (f) => f.type === "richtext" || f.key === "body" || f.key === "content"
+    );
+  };
+
   // Active item in editor
   const activeItem =
     currentItems.find((i) => i.id === selectedItemId) ||
@@ -834,15 +865,23 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               id: `f_${cleanSlug}_cover`,
               key: "coverImage",
               label: "Cover Image",
-              type: "url",
-              placeholder: "https://example.com/cover.jpg",
+              type: "image",
+              placeholder: "Upload cover image or enter URL",
+            },
+            {
+              id: `f_${cleanSlug}_body`,
+              key: "body",
+              label: "Article Body (Markdown)",
+              type: "richtext",
+              required: true,
+              placeholder: "Write rich text or markdown content...",
             },
             {
               id: `f_${cleanSlug}_content`,
               key: "content",
-              label: "Rich Text Content",
+              label: "Content",
               type: "richtext",
-              placeholder: "Write article content...",
+              placeholder: "Article content...",
             },
             {
               id: `f_${cleanSlug}_summary`,
@@ -921,6 +960,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             icon: newSectionIcon,
             description: desc,
             fields: defaultFields,
+            type: newSectionType,
           }),
         });
         if (res.ok) {
@@ -934,6 +974,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       }
     }
 
+    const createdType = newSectionType;
     const newSec: SectionDefinition = {
       id: newId,
       name: newSectionName.trim(),
@@ -941,7 +982,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       slug: cleanSlug,
       icon: newSectionIcon,
       description: desc,
-      type: newSectionType,
+      type: createdType,
     };
 
     setSections((prev) => {
@@ -973,14 +1014,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     });
 
     setActiveSectionId(newId);
-    setWorkspaceMode("list");
     setIsAddSectionModalOpen(false);
     setNewSectionName("");
     setNewSectionSingular("");
     setNewSectionDescription("");
     setNewSectionType("normal");
 
-    showToast(`Created new ${newSectionType === "editor" ? "Text Editor" : "Normal"} collection "${newSec.name}"!`);
+    if (createdType === "editor") {
+      setEditingArticleItem(null);
+      setWorkspaceMode("article-editor");
+    } else {
+      setWorkspaceMode("list");
+    }
+
+    showToast(`Created new ${createdType === "editor" ? "Text Editor" : "Normal"} collection "${newSec.name}"!`);
   };
 
   // -------------------------------------------------------------
@@ -1072,6 +1119,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   // ACTION: Open Add Item Modal (Clean data entry without schema controls)
   // -------------------------------------------------------------
   const handleOpenAddModal = () => {
+    if (isEditorSection(activeSection)) {
+      handleOpenArticleEditor(null);
+      return;
+    }
     const initialData: Record<string, any> = {};
     currentFields.forEach((field) => {
       if (field.type === "nested") {
@@ -1346,9 +1397,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         [activeSectionId]: fieldsToSave,
         [activeSection.slug]: fieldsToSave,
         ...(activeSection.id ? { [activeSection.id]: fieldsToSave } : {}),
-        ...(activeSection.slug === "posts" ? { blog: fieldsToSave } : {}),
+        ...(activeSection.slug === "posts" || activeSection.id === "blog" || activeSectionId === "blog"
+          ? { blog: fieldsToSave, posts: fieldsToSave }
+          : {}),
       };
       persistFields(next);
+      return next;
+    });
+
+    setSections((prev) => {
+      const next = prev.map((s) =>
+        s.id === activeSection.id || s.slug === activeSection.slug || s.id === activeSectionId
+          ? { ...s, fields: fieldsToSave }
+          : s
+      );
+      persistSections(next);
       return next;
     });
 
@@ -1459,6 +1522,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   // Open editor for an item
   const handleOpenEditor = (item: ItemData) => {
+    if (isEditorSection(activeSection)) {
+      handleOpenArticleEditor(item);
+      return;
+    }
     setSelectedItemId(item.id);
     setWorkspaceMode("editor");
   };
@@ -2022,6 +2089,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               sectionSlug={activeSection.slug}
               initialItem={editingArticleItem}
               currentUser={currentUser}
+              customFields={currentFields}
               onCancel={() => {
                 setWorkspaceMode("list");
                 setEditingArticleItem(null);
@@ -2128,10 +2196,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                         {/* Plus Icon to Add New Item (Text Editor sections open full-page article editor, Normal sections open popup modal) */}
                         <button
                           onClick={() => {
-                            const isEditor =
-                              activeSection.type === "editor" ||
-                              activeSection.slug === "posts";
-                            if (isEditor) {
+                            if (isEditorSection(activeSection)) {
                               handleOpenArticleEditor(null);
                             } else {
                               handleOpenAddModal();
@@ -2141,7 +2206,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                           className="px-4 py-2 bg-[#0F241D] hover:bg-[#1a3f32] active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
                         >
                           <Plus className="w-4 h-4 text-[#B8F256]" />
-                          <span>Add {activeSection.singularName}</span>
+                          <span>
+                            {isEditorSection(activeSection)
+                              ? `Write ${activeSection.singularName}`
+                              : `Add ${activeSection.singularName}`}
+                          </span>
                         </button>
                       </div>
                     </div>
@@ -2287,47 +2356,76 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                           : `Get started by adding your first ${activeSection.singularName.toLowerCase()}.`}
                       </p>
                       <button
-                        onClick={handleOpenAddModal}
+                        onClick={() => {
+                          if (isEditorSection(activeSection)) {
+                            handleOpenArticleEditor(null);
+                          } else {
+                            handleOpenAddModal();
+                          }
+                        }}
                         className="px-4 py-2 bg-[#0F241D] hover:bg-[#1a3f32] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
                       >
                         <Plus className="w-4 h-4 text-[#B8F256]" />
-                        <span>Add New Item</span>
+                        <span>
+                          {isEditorSection(activeSection)
+                            ? `Write First ${activeSection.singularName}`
+                            : `Add New Item`}
+                        </span>
                       </button>
                     </div>
                   ) : (
                     /* CARDS LIST */
                     <div className="space-y-3 flex-1">
-                      {filteredItems.map((item) => (
-                        <div
-                          key={item.id}
-                          className="group p-4 sm:p-5 rounded-2xl border border-slate-200/90 hover:border-[#B8F256] hover:shadow-sm bg-white transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer"
-                          onClick={() => {
-                            const isEditor =
-                              activeSection.type === "editor" ||
-                              activeSection.slug === "posts";
-                            if (isEditor) {
-                              handleOpenArticleEditor(item);
-                            } else {
-                              handleOpenEditor(item);
+                      {filteredItems.map((item) => {
+                        const itemPhotos = (() => {
+                          const photos: { key: string; label: string; url: string }[] = [];
+                          const seenUrls = new Set<string>();
+
+                          const primary = item.image || item.coverImage || item.photo;
+                          if (primary && typeof primary === "string") {
+                            photos.push({ key: "image", label: "Primary Photo", url: primary });
+                            seenUrls.add(primary);
+                          }
+
+                          currentFields.forEach((f) => {
+                            const val = item[f.key];
+                            if (f.type === "image" && val && typeof val === "string" && !seenUrls.has(val)) {
+                              photos.push({ key: f.key, label: f.label, url: val });
+                              seenUrls.add(val);
                             }
-                          }}
-                        >
-                          {/* Item Left Info */}
-                          <div className="flex items-start gap-3.5 min-w-0">
-                            <div className="w-10 h-10 rounded-xl bg-[#F4F8F1] border border-[#DEE8DB] overflow-hidden flex items-center justify-center text-slate-800 shrink-0 group-hover:bg-[#EAF6E3] transition-colors shadow-2xs">
-                              {item.image || item.coverImage || item.photo ? (
-                                <img
-                                  src={item.image || item.coverImage || item.photo}
-                                  alt={item.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                renderSectionIcon(
-                                  activeSection.icon,
-                                  "w-5 h-5 text-[#0F241D]"
-                                )
-                              )}
-                            </div>
+                          });
+
+                          return photos;
+                        })();
+
+                        return (
+                          <div
+                            key={item.id}
+                            className="group p-4 sm:p-5 rounded-2xl border border-slate-200/90 hover:border-[#B8F256] hover:shadow-sm bg-white transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer"
+                            onClick={() => {
+                              if (isEditorSection(activeSection)) {
+                                handleOpenArticleEditor(item);
+                              } else {
+                                handleOpenEditor(item);
+                              }
+                            }}
+                          >
+                            {/* Item Left Info */}
+                            <div className="flex items-start gap-3.5 min-w-0">
+                              <div className="w-10 h-10 rounded-xl bg-[#F4F8F1] border border-[#DEE8DB] overflow-hidden flex items-center justify-center text-slate-800 shrink-0 group-hover:bg-[#EAF6E3] transition-colors shadow-2xs">
+                                {itemPhotos.length > 0 ? (
+                                  <img
+                                    src={itemPhotos[0].url}
+                                    alt={item.title}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  renderSectionIcon(
+                                    activeSection.icon,
+                                    "w-5 h-5 text-[#0F241D]"
+                                  )
+                                )}
+                              </div>
 
                             <div className="min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -2353,6 +2451,32 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                                   item.excerpt ||
                                   "No description provided yet."}
                               </p>
+
+                              {/* Multiple photos thumbnail gallery strip */}
+                              {itemPhotos.length > 1 && (
+                                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#EEF5EB] text-[10px] font-bold text-[#0F241D] border border-[#DEE8DB]">
+                                    <ImageIcon className="w-2.5 h-2.5 text-emerald-700" />
+                                    <span>{itemPhotos.length} photos</span>
+                                  </span>
+                                  <div className="flex items-center -space-x-1.5">
+                                    {itemPhotos.slice(0, 5).map((photo, pIdx) => (
+                                      <img
+                                        key={pIdx}
+                                        src={photo.url}
+                                        alt={photo.label}
+                                        title={photo.label}
+                                        className="w-5 h-5 rounded-md object-cover border border-white shadow-2xs"
+                                      />
+                                    ))}
+                                    {itemPhotos.length > 5 && (
+                                      <span className="w-5 h-5 rounded-md bg-slate-100 text-[9px] font-bold text-slate-600 flex items-center justify-center border border-white shadow-2xs">
+                                        +{itemPhotos.length - 5}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
 
                               {/* Render Nested Fields preview if present */}
                               {Object.entries(item).some(
@@ -2388,14 +2512,74 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                                 </div>
                               )}
 
-                              {/* Metadata pills */}
-                              <div className="flex items-center gap-3 mt-2 text-[11px] text-slate-400">
+                              {/* Metadata pills & Custom Field Badges */}
+                              <div className="flex items-center gap-2 mt-2 text-[11px] text-slate-500 flex-wrap">
                                 {item.category && (
-                                  <span className="flex items-center gap-1 font-medium text-slate-600 bg-[#F4F6F2] px-2 py-0.5 rounded-md">
+                                  <span className="flex items-center gap-1 font-medium text-slate-600 bg-[#F4F6F2] px-2 py-0.5 rounded-md border border-[#E4ECE1]">
                                     <Tag className="w-3 h-3 text-slate-400" />
                                     {item.category}
                                   </span>
                                 )}
+
+                                {/* Render custom scalar fields entered by user */}
+                                {currentFields
+                                  .filter(
+                                    (f) =>
+                                      ![
+                                        "title",
+                                        "status",
+                                        "summary",
+                                        "excerpt",
+                                        "image",
+                                        "coverImage",
+                                        "content",
+                                        "body",
+                                        "category",
+                                      ].includes(f.key)
+                                  )
+                                  .map((field) => {
+                                    const val = item[field.key];
+                                    if (
+                                      val === undefined ||
+                                      val === null ||
+                                      val === "" ||
+                                      typeof val === "object"
+                                    )
+                                      return null;
+
+                                    if (field.type === "image") {
+                                      return (
+                                        <span
+                                          key={field.key}
+                                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-[#F4F7F2] text-[10px] text-slate-700 border border-[#DEE7DA]"
+                                        >
+                                          <img
+                                            src={String(val)}
+                                            alt={field.label}
+                                            className="w-3.5 h-3.5 rounded object-cover"
+                                          />
+                                          <span className="font-semibold text-slate-600">
+                                            {field.label}
+                                          </span>
+                                        </span>
+                                      );
+                                    }
+
+                                    return (
+                                      <span
+                                        key={field.key}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#F4F7F2] text-[10px] text-slate-700 border border-[#DEE7DA]"
+                                      >
+                                        <span className="font-semibold text-slate-500">
+                                          {field.label}:
+                                        </span>
+                                        <strong className="text-slate-800 truncate max-w-[160px]">
+                                          {String(val)}
+                                        </strong>
+                                      </span>
+                                    );
+                                  })}
+
                                 <span>Updated {item.updatedAt}</span>
                               </div>
                             </div>
@@ -2408,10 +2592,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                           >
                             <button
                               onClick={() => {
-                                const isEditor =
-                                  activeSection.type === "editor" ||
-                                  activeSection.slug === "posts";
-                                if (isEditor) {
+                                if (isEditorSection(activeSection)) {
                                   handleOpenArticleEditor(item);
                                 } else {
                                   handleOpenEditor(item);
@@ -2434,7 +2615,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                             </button>
                           </div>
                         </div>
-                      ))}
+                      );
+                    })}
                     </div>
                   )}
 
@@ -2539,48 +2721,78 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
                     {editorActiveView === "editor" && activeItem ? (
                       <div className="space-y-4">
-                        {/* Built-in Single Image / Photo Uploader (1 photo max) */}
-                        <div className="p-4 rounded-2xl bg-white border border-[#DEE8DB] shadow-xs">
-                          <SingleImageUploader
-                            value={activeItem.image || activeItem.coverImage || activeItem.photo || ""}
-                            onChange={(imgUrl) => {
-                              const next = {
-                                ...activeItem,
-                                image: imgUrl,
-                                coverImage: imgUrl,
-                                photo: imgUrl,
-                              };
-                              updateActiveItem(next);
-                            }}
-                            label={`${activeSection.singularName} Image / Photo`}
-                            helperText={`Upload at most one photo for this ${activeSection.singularName.toLowerCase()}. Auto-compressed to WebP.`}
-                            compact
-                          />
-                        </div>
+                        {/* Fallback Single Image Uploader only if current schema has NO image fields */}
+                        {!currentFields.some(
+                          (f) =>
+                            f.type === "image" ||
+                            f.key === "image" ||
+                            f.key === "coverImage"
+                        ) && (
+                          <div className="p-4 rounded-2xl bg-white border border-[#DEE8DB] shadow-xs">
+                            <SingleImageUploader
+                              value={
+                                activeItem.image ||
+                                activeItem.coverImage ||
+                                activeItem.photo ||
+                                ""
+                              }
+                              onChange={(imgUrl) => {
+                                const next = {
+                                  ...activeItem,
+                                  image: imgUrl,
+                                  coverImage: imgUrl,
+                                  photo: imgUrl,
+                                };
+                                updateActiveItem(next);
+                              }}
+                              label={`${activeSection.singularName} Image / Photo`}
+                              helperText={`Upload photo for this ${activeSection.singularName.toLowerCase()}. Auto-compressed to WebP.`}
+                              compact
+                            />
+                          </div>
+                        )}
 
-                        {/* Dynamic fields based on schema, including nested fields! */}
+                        {/* Dynamic fields based on schema, including image fields! */}
                         {currentFields.map((field) => {
                           const val = activeItem[field.key];
 
-                          // Skip redundant field if key is 'image' or 'coverImage' since handled above
-                          if (field.key === "image" || field.key === "coverImage") {
-                            return null;
-                          }
-
-                          // 0. CUSTOM IMAGE FIELD RENDERER
-                          if (field.type === "image") {
+                          // 0. IMAGE FIELD RENDERER (Supports multiple image fields configured in Edit Fields!)
+                          if (
+                            field.type === "image" ||
+                            field.key === "image" ||
+                            field.key === "coverImage"
+                          ) {
+                            const imgVal =
+                              val ||
+                              (field.key === "image"
+                                ? activeItem.coverImage || activeItem.photo || ""
+                                : "");
                             return (
-                              <div key={field.id} className="p-4 rounded-2xl bg-[#F8FAF6] border border-[#DEE8DB]">
+                              <div
+                                key={field.id}
+                                className="p-4 rounded-2xl bg-[#F8FAF6] border border-[#DEE8DB]"
+                              >
                                 <SingleImageUploader
-                                  value={val || ""}
+                                  value={imgVal || ""}
                                   onChange={(imgUrl) => {
                                     const next = {
                                       ...activeItem,
                                       [field.key]: imgUrl,
                                     };
+                                    if (
+                                      field.key === "image" ||
+                                      field.key === "coverImage"
+                                    ) {
+                                      next.image = imgUrl;
+                                      next.coverImage = imgUrl;
+                                      next.photo = imgUrl;
+                                    } else if (!next.image && !next.coverImage) {
+                                      next.image = imgUrl;
+                                    }
                                     updateActiveItem(next);
                                   }}
                                   label={field.label}
+                                  helperText={`Upload photo for ${field.label.toLowerCase()}. Auto-compressed to WebP.`}
                                   compact
                                 />
                               </div>
@@ -3076,44 +3288,78 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               onSubmit={handleSaveNewItem}
               className="flex-1 overflow-y-auto py-4 space-y-4 pr-1"
             >
-              {/* Single Image / Photo Uploader (1 photo max) */}
-              <div className="p-3.5 rounded-2xl bg-[#F6FAF3] border border-[#DEE8DB]">
-                <SingleImageUploader
-                  value={newItemFormData.image || newItemFormData.coverImage || ""}
-                  onChange={(imgUrl) => {
-                    setNewItemFormData({
-                      ...newItemFormData,
-                      image: imgUrl,
-                      coverImage: imgUrl,
-                      photo: imgUrl,
-                    });
-                  }}
-                  label={`${activeSection.singularName} Photo / Image`}
-                  helperText={`Upload at most one photo for this ${activeSection.singularName.toLowerCase()}. Auto-compressed to WebP.`}
-                  compact
-                />
-              </div>
+              {/* Fallback Single Image Uploader only if current schema has NO image fields */}
+              {!currentFields.some(
+                (f) =>
+                  f.type === "image" ||
+                  f.key === "image" ||
+                  f.key === "coverImage"
+              ) && (
+                <div className="p-3.5 rounded-2xl bg-[#F6FAF3] border border-[#DEE8DB]">
+                  <SingleImageUploader
+                    value={
+                      newItemFormData.image ||
+                      newItemFormData.coverImage ||
+                      newItemFormData.photo ||
+                      ""
+                    }
+                    onChange={(imgUrl) => {
+                      setNewItemFormData((prev) => ({
+                        ...prev,
+                        image: imgUrl,
+                        coverImage: imgUrl,
+                        photo: imgUrl,
+                      }));
+                    }}
+                    label={`${activeSection.singularName} Photo / Image`}
+                    helperText={`Upload photo for this ${activeSection.singularName.toLowerCase()}. Auto-compressed to WebP.`}
+                    compact
+                  />
+                </div>
+              )}
 
               {currentFields.map((field) => {
-                // Skip redundant field if key is 'image' or 'coverImage' since handled above
-                if (field.key === "image" || field.key === "coverImage") {
-                  return null;
-                }
-
-                // Custom image field type
-                if (field.type === "image") {
+                // Image field type (or key 'image'/'coverImage')
+                if (
+                  field.type === "image" ||
+                  field.key === "image" ||
+                  field.key === "coverImage"
+                ) {
                   return (
-                    <div key={field.id} className="p-3.5 rounded-2xl bg-[#F6FAF3] border border-[#DEE8DB]">
+                    <div
+                      key={field.id}
+                      className="p-3.5 rounded-2xl bg-[#F6FAF3] border border-[#DEE8DB]"
+                    >
                       <SingleImageUploader
-                        value={newItemFormData[field.key] || newItemFormData.image || ""}
+                        value={
+                          newItemFormData[field.key] ||
+                          (field.key === "image"
+                            ? newItemFormData.coverImage ||
+                              newItemFormData.photo ||
+                              ""
+                            : "")
+                        }
                         onChange={(imgUrl) => {
-                          setNewItemFormData({
-                            ...newItemFormData,
-                            [field.key]: imgUrl,
-                            image: imgUrl,
+                          setNewItemFormData((prev) => {
+                            const updated = {
+                              ...prev,
+                              [field.key]: imgUrl,
+                            };
+                            if (
+                              field.key === "image" ||
+                              field.key === "coverImage"
+                            ) {
+                              updated.image = imgUrl;
+                              updated.coverImage = imgUrl;
+                              updated.photo = imgUrl;
+                            } else if (!updated.image && !updated.coverImage) {
+                              updated.image = imgUrl;
+                            }
+                            return updated;
                           });
                         }}
                         label={field.label}
+                        helperText={`Upload photo for ${field.label.toLowerCase()}. Auto-compressed to WebP.`}
                         compact
                       />
                     </div>
@@ -3241,7 +3487,40 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   );
                 }
 
-                if (field.type === "textarea" || field.type === "richtext") {
+                if (field.type === "richtext") {
+                  return (
+                    <div key={field.id}>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-bold text-slate-700">
+                          {field.label}{" "}
+                          {field.required && (
+                            <span className="text-rose-500">*</span>
+                          )}
+                        </label>
+                        <span className="text-[10px] font-semibold text-[#0F241D] bg-[#EEF5EB] px-2 py-0.5 rounded-full border border-[#DCE8D8]">
+                          Markdown Rich Text
+                        </span>
+                      </div>
+                      <textarea
+                        rows={6}
+                        placeholder={
+                          field.placeholder ||
+                          `Write markdown or formatted text for ${field.label.toLowerCase()}...`
+                        }
+                        value={newItemFormData[field.key] || ""}
+                        onChange={(e) =>
+                          setNewItemFormData({
+                            ...newItemFormData,
+                            [field.key]: e.target.value,
+                          })
+                        }
+                        className="w-full p-2.5 rounded-xl border border-slate-200 text-xs font-mono text-slate-800 focus:outline-none focus:border-[#0F241D] resize-y"
+                      />
+                    </div>
+                  );
+                }
+
+                if (field.type === "textarea") {
                   return (
                     <div key={field.id}>
                       <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -3532,7 +3811,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                         <option value="text">Text (Single line)</option>
                         <option value="textarea">Textarea (Multi-line)</option>
                         <option value="richtext">Rich Text / Markdown</option>
-                        <option value="image">Image / Photo (1 file max)</option>
+                        <option value="image">Image / Photo</option>
                         <option value="number">Number</option>
                         <option value="url">URL / Link</option>
                         <option value="nested">
@@ -3602,7 +3881,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                           placeholder="Sub-field name (e.g. meta_title, company)"
                           value={tempSubFieldLabel}
                           onChange={(e) => setTempSubFieldLabel(e.target.value)}
-                          className="flex-1 p-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:border-[#0F241D]"
+                          className="flex-1 p-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none border-[#0F241D]"
                         />
                         <select
                           value={tempSubFieldType}
@@ -3613,6 +3892,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                         >
                           <option value="text">Text</option>
                           <option value="textarea">Textarea</option>
+                          <option value="image">Image / Photo</option>
                           <option value="number">Number</option>
                           <option value="url">URL</option>
                         </select>
@@ -3675,9 +3955,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       {/* ==================================================================== */}
       {isAddSectionModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#0F241D]/60 backdrop-blur-xs animate-in fade-in">
-          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full p-4 sm:p-6 md:p-8 shadow-2xl border border-slate-200 max-h-[92vh] flex flex-col">
+          <div className="bg-white rounded-2xl sm:rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col overflow-hidden">
             {/* Modal Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div className="flex items-center justify-between p-4 sm:p-6 pb-4 border-b border-slate-100 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-xl bg-[#0F241D] text-[#B8F256] flex items-center justify-center font-bold">
                   <Plus className="w-4 h-4" />
@@ -3692,6 +3972,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setIsAddSectionModalOpen(false)}
                 className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
@@ -3700,165 +3981,172 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleCreateSection} className="py-4 space-y-4">
-              {/* Section Type Selector (Normal vs Text Editor) */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1.5">
-                  Choose Section Type <span className="text-rose-500">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setNewSectionType("normal")}
-                    className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                      newSectionType === "normal"
-                        ? "border-[#0F241D] bg-[#EEF5EB] ring-2 ring-[#0F241D]/20 shadow-xs"
-                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <LayoutGrid className="w-4 h-4 text-[#0F241D]" />
-                        <span className="text-xs font-extrabold text-[#0F241D]">
-                          Normal Section
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-tight">
-                        Structured fields (skills, projects, services) with modal popup entry.
-                      </p>
-                    </div>
-                    <span className="mt-2.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-600 w-max">
-                      Modal Form
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewSectionType("editor");
-                      if (newSectionIcon === "layers") {
-                        setNewSectionIcon("file-text");
-                      }
-                    }}
-                    className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
-                      newSectionType === "editor"
-                        ? "border-[#0F241D] bg-[#EEF5EB] ring-2 ring-[#0F241D]/20 shadow-xs"
-                        : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <FileText className="w-4 h-4 text-[#0F241D]" />
-                        <span className="text-xs font-extrabold text-[#0F241D]">
-                          Text Editor Section
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500 leading-tight">
-                        Rich text styles, cover image, and full-page drafting & publishing.
-                      </p>
-                    </div>
-                    <span className="mt-2.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#B8F256] text-[#0F241D] w-max">
-                      Full-Page Editor
-                    </span>
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Section Name (Plural) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Testimonials, Case Studies, Services, FAQs"
-                  value={newSectionName}
-                  onChange={(e) => {
-                    setNewSectionName(e.target.value);
-                    if (!newSectionSingular) {
-                      setNewSectionSingular(e.target.value.replace(/s$/, ""));
-                    }
-                  }}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Singular Item Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Testimonial, Case Study, Service"
-                  value={newSectionSingular}
-                  onChange={(e) => setNewSectionSingular(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Section Icon
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(
-                    [
-                      "layers",
-                      "folder",
-                      "file-text",
-                      "shopping-bag",
-                      "sparkles",
-                      "star",
-                      "award",
-                      "globe",
-                    ] as const
-                  ).map((ic) => (
+            <form onSubmit={handleCreateSection} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 py-4 space-y-4">
+                {/* Section Type Selector (Normal vs Text Editor) */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Choose Section Type <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2.5">
                     <button
-                      key={ic}
                       type="button"
-                      onClick={() => setNewSectionIcon(ic)}
-                      className={`p-2.5 rounded-xl border flex flex-col items-center gap-1 transition-all ${
-                        newSectionIcon === ic
-                          ? "border-[#0F241D] bg-[#EEF5EB] text-[#0F241D] font-bold ring-1 ring-[#0F241D]"
-                          : "border-slate-200 hover:bg-slate-50 text-slate-600"
+                      onClick={() => setNewSectionType("normal")}
+                      className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                        newSectionType === "normal"
+                          ? "border-[#0F241D] bg-[#EEF5EB] ring-2 ring-[#0F241D]/20 shadow-xs"
+                          : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
                       }`}
                     >
-                      {renderSectionIcon(ic, "w-4 h-4")}
-                      <span className="text-[10px] capitalize">{ic}</span>
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <LayoutGrid className="w-4 h-4 text-[#0F241D]" />
+                          <span className="text-xs font-extrabold text-[#0F241D]">
+                            Normal Section
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-tight">
+                          Structured fields (skills, projects, services) with modal popup entry.
+                        </p>
+                      </div>
+                      <span className="mt-2.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-white border border-slate-200 text-slate-600 w-max">
+                        Modal Form
+                      </span>
                     </button>
-                  ))}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewSectionType("editor");
+                        if (newSectionIcon === "layers") {
+                          setNewSectionIcon("file-text");
+                        }
+                      }}
+                      className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                        newSectionType === "editor"
+                          ? "border-[#0F241D] bg-[#EEF5EB] ring-2 ring-[#0F241D]/20 shadow-xs"
+                          : "border-slate-200 bg-white hover:bg-slate-50 text-slate-600"
+                      }`}
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <FileText className="w-4 h-4 text-[#0F241D]" />
+                          <span className="text-xs font-extrabold text-[#0F241D]">
+                            Text Editor Section
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-tight">
+                          Rich text styles, cover image, and full-page drafting & publishing.
+                        </p>
+                      </div>
+                      <span className="mt-2.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#B8F256] text-[#0F241D] w-max">
+                        Full-Page Editor
+                      </span>
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Section Name (Plural) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Articles, Testimonials, Case Studies, FAQs"
+                    value={newSectionName}
+                    onChange={(e) => {
+                      setNewSectionName(e.target.value);
+                      if (!newSectionSingular) {
+                        setNewSectionSingular(e.target.value.replace(/s$/, ""));
+                      }
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Singular Item Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Article, Testimonial, Case Study"
+                    value={newSectionSingular}
+                    onChange={(e) => setNewSectionSingular(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Section Icon
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(
+                      [
+                        "layers",
+                        "folder",
+                        "file-text",
+                        "shopping-bag",
+                        "sparkles",
+                        "star",
+                        "award",
+                        "globe",
+                      ] as const
+                    ).map((ic) => (
+                      <button
+                        key={ic}
+                        type="button"
+                        onClick={() => setNewSectionIcon(ic)}
+                        className={`p-2.5 rounded-xl border flex flex-col items-center gap-1 transition-all ${
+                          newSectionIcon === ic
+                            ? "border-[#0F241D] bg-[#EEF5EB] text-[#0F241D] font-bold ring-1 ring-[#0F241D]"
+                            : "border-slate-200 hover:bg-slate-50 text-slate-600"
+                        }`}
+                      >
+                        {renderSectionIcon(ic, "w-4 h-4")}
+                        <span className="text-[10px] capitalize">{ic}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Description / Note
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Long-form articles and guides for portfolio visitors"
+                    value={newSectionDescription}
+                    onChange={(e) => setNewSectionDescription(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
-                  Description / Note
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Client reviews and ratings for portfolio display"
-                  value={newSectionDescription}
-                  onChange={(e) => setNewSectionDescription(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
-                />
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="pt-4 border-t border-slate-100 flex items-center justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setIsAddSectionModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2.5 bg-[#0F241D] hover:bg-[#1a3f32] text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all"
-                >
-                  <Plus className="w-3.5 h-3.5 text-[#B8F256]" />
-                  <span>Create Section</span>
-                </button>
+              {/* Sticky Modal Footer with always visible Save Section button */}
+              <div className="p-4 sm:px-6 py-3 border-t border-slate-100 bg-slate-50/70 flex items-center justify-between shrink-0">
+                <span className="text-xs text-slate-500">
+                  {newSectionType === "editor" ? "Rich text editor enabled" : "Standard structured fields"}
+                </span>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsAddSectionModalOpen(false)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-200/60 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2.5 bg-[#0F241D] hover:bg-[#1a3f32] active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-md transition-all"
+                  >
+                    <Check className="w-3.5 h-3.5 text-[#B8F256]" />
+                    <span>Save Section</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>

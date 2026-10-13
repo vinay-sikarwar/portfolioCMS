@@ -6,6 +6,7 @@ interface NavbarProps {
   onLogin: () => void;
   onSignUp: () => void;
   onGoToDashboard?: () => void;
+  onOpenDocs?: () => void;
   currentUser?: { name: string; email: string } | null;
   onLogout?: () => void;
 }
@@ -14,6 +15,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogin,
   onSignUp,
   onGoToDashboard,
+  onOpenDocs,
   currentUser,
   onLogout,
 }) => {
@@ -24,7 +26,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     { name: 'Features', href: '#features' },
     { name: 'How It Works', href: '#how-it-works' },
     { name: 'Docs', href: '#docs' },
-    { name: 'API', href: '#api' },
     { name: 'Blog', href: '#blog' },
   ];
 
@@ -55,6 +56,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                 onClick={(e) => {
                   e.preventDefault();
                   setActiveTab(link.name);
+                  if (link.name === 'Docs') {
+                    onOpenDocs?.();
+                    return;
+                  }
                   const target = document.querySelector(link.href);
                   if (target) {
                     target.scrollIntoView({ behavior: 'smooth' });
@@ -137,9 +142,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <a
               key={link.name}
               href={link.href}
-              onClick={() => {
+              onClick={(e) => {
+                e.preventDefault();
                 setActiveTab(link.name);
                 setMobileMenuOpen(false);
+                if (link.name === 'Docs') {
+                  onOpenDocs?.();
+                  return;
+                }
+                const target = document.querySelector(link.href);
+                if (target) {
+                  target.scrollIntoView({ behavior: 'smooth' });
+                }
               }}
               className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                 activeTab === link.name

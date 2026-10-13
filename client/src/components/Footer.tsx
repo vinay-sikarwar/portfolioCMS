@@ -1,7 +1,11 @@
 import React from 'react';
 import { BrandLogo } from './BrandLogo';
 
-export const Footer: React.FC = () => {
+interface FooterProps {
+  onOpenDocs?: () => void;
+}
+
+export const Footer: React.FC<FooterProps> = ({ onOpenDocs }) => {
   return (
     <footer className="mt-20 border-t border-[#E3EAE0] bg-white pt-16 pb-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
@@ -30,7 +34,7 @@ export const Footer: React.FC = () => {
               <li><a href="#features" className="hover:text-[#0F241D] transition-colors">Features</a></li>
               <li><a href="#how-it-works" className="hover:text-[#0F241D] transition-colors">How It Works</a></li>
               <li><a href="#pricing" className="hover:text-[#0F241D] transition-colors">Pricing</a></li>
-              <li><a href="#api" className="hover:text-[#0F241D] transition-colors">API Reference</a></li>
+              <li><button onClick={onOpenDocs} className="hover:text-[#0F241D] transition-colors text-left">API Reference</button></li>
             </ul>
           </div>
 
@@ -40,7 +44,7 @@ export const Footer: React.FC = () => {
               Resources
             </h4>
             <ul className="space-y-2 text-xs text-slate-600">
-              <li><a href="#docs" className="hover:text-[#0F241D] transition-colors">Documentation</a></li>
+              <li><button onClick={onOpenDocs} className="hover:text-[#0F241D] transition-colors text-left">Documentation</button></li>
               <li><a href="#blog" className="hover:text-[#0F241D] transition-colors">Blog</a></li>
               <li><a href="#" className="hover:text-[#0F241D] transition-colors">Templates</a></li>
               <li><a href="#" className="hover:text-[#0F241D] transition-colors">Changelog</a></li>
