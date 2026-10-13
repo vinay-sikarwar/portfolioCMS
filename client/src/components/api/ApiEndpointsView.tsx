@@ -264,7 +264,7 @@ export const ApiEndpointsView: React.FC<ApiEndpointsViewProps> = ({
             </span>
             {liveResponse && (
               <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 text-[10px] font-mono font-bold">
-                live from Neon DB
+                Live Edge Response
               </span>
             )}
           </div>

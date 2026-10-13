@@ -576,29 +576,62 @@ app.post("/api/v1/:apiSlug/sections", async (req: Request, res: Response) => {
   }
 });
 
-// Update section with verified ownership (fixes IDOR vulnerability)
+// Helper to resolve a section by id, slug, or name
+async function resolveSection(userId: string, sectionIdentifier: string) {
+  if (!sectionIdentifier) return null;
+  return prisma.section.findFirst({
+    where: {
+      userId,
+      OR: [
+        { id: sectionIdentifier },
+        { slug: sectionIdentifier },
+        { slug: sectionIdentifier.toLowerCase() },
+        { name: { equals: sectionIdentifier, mode: "insensitive" } },
+        ...(sectionIdentifier.toLowerCase() === "blog" ? [{ slug: "posts" }] : []),
+      ],
+    },
+  });
+}
+
+// Update section with verified ownership (fixes IDOR vulnerability & supports resolving by slug or cuid)
 app.put("/api/v1/:apiSlug/sections/:id", async (req: Request, res: Response) => {
   try {
     if (!requireWriteAccess(req, res)) return;
     const { id } = req.params;
     const { name, singularName, icon, description, fields } = req.body;
 
-    const existing = await prisma.section.findFirst({
-      where: { id, userId: req.userId },
-    });
+    let parsedFields: any = undefined;
+    if (fields !== undefined) {
+      parsedFields = typeof fields === "object" ? fields : JSON.parse(fields || "[]");
+    }
+
+    let existing = await resolveSection(req.userId!, id);
     if (!existing) {
-      res.status(404).json({ error: "Section not found or not owned by you" });
+      // Auto-create if not found yet in Neon DB
+      const cleanSlug = (id || name || "custom").toLowerCase().trim().replace(/[^a-z0-9]/g, "_");
+      existing = await prisma.section.create({
+        data: {
+          userId: req.userId!,
+          name: name?.trim() || id,
+          singularName: singularName?.trim() || name?.trim() || id,
+          slug: cleanSlug,
+          icon: icon || "layers",
+          description: description?.trim() || "",
+          fields: parsedFields !== undefined ? parsedFields : [],
+        },
+      });
+      res.json({ status: 200, data: existing });
       return;
     }
 
     const section = await prisma.section.update({
-      where: { id },
+      where: { id: existing.id },
       data: {
-        name,
-        singularName,
-        icon,
-        description,
-        fields: typeof fields === "object" ? fields : JSON.parse(fields || "[]"),
+        ...(name ? { name: name.trim() } : {}),
+        ...(singularName ? { singularName: singularName.trim() } : {}),
+        ...(icon ? { icon } : {}),
+        ...(description !== undefined ? { description: description.trim() } : {}),
+        ...(parsedFields !== undefined ? { fields: parsedFields } : {}),
       },
     });
 
@@ -613,13 +646,14 @@ app.delete("/api/v1/:apiSlug/sections/:id", async (req: Request, res: Response) 
   try {
     if (!requireWriteAccess(req, res)) return;
     const { id } = req.params;
-    const deleted = await prisma.section.deleteMany({
-      where: { id, userId: req.userId },
-    });
-    if (!deleted.count) {
+    const existing = await resolveSection(req.userId!, id);
+    if (!existing) {
       res.status(404).json({ error: "Section not found" });
       return;
     }
+    await prisma.section.delete({
+      where: { id: existing.id },
+    });
     res.json({ status: 200, message: "Section and its contents deleted successfully" });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -681,20 +715,7 @@ app.delete("/api/v1/:apiSlug/keys/:id", async (req: Request, res: Response) => {
   }
 });
 
-// Helper to resolve a section by slug or name
-async function resolveSection(userId: string, sectionSlug: string) {
-  return prisma.section.findFirst({
-    where: {
-      userId,
-      OR: [
-        { slug: sectionSlug },
-        { slug: sectionSlug.toLowerCase() },
-        { name: { equals: sectionSlug, mode: "insensitive" } },
-        ...(sectionSlug.toLowerCase() === "blog" ? [{ slug: "posts" }] : []),
-      ],
-    },
-  });
-}
+
 
 // 2. UNIVERSAL DYNAMIC CRUD ENDPOINTS FOR ANY COLLECTION
 // (Projects, Posts, Skills, Testimonials, Experience, etc.)

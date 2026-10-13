@@ -9,8 +9,6 @@ import {
   User,
   ArrowRight,
   Sparkles,
-  Database,
-  Flame,
   AlertCircle,
 } from "lucide-react";
 import { BrandLogo } from "./BrandLogo";
@@ -305,15 +303,11 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
         <BrandLogo onClick={onBack} size="md" />
 
-        {/* Clean Stack Status: Firebase Auth + Prisma DB */}
+        {/* Clean Status Badge */}
         <div className="flex items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-xs font-bold text-amber-900">
-            <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-            <span>Firebase Auth</span>
-          </div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800">
-            <Database className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Prisma DB</span>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#EEF5EB] border border-[#DCE4D8] text-xs font-bold text-[#0F241D]">
+            <span className="w-2 h-2 rounded-full bg-[#B8F256]"></span>
+            <span>Secure Access</span>
           </div>
         </div>
       </header>
@@ -335,9 +329,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 Empower Your Dynamic Portfolio.
               </h2>
               <p className="mt-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
-                Clean and functional: <strong>Firebase</strong> manages user
-                authentication, while <strong>Prisma ORM</strong> stores all
-                user data, portfolio projects, and API keys.
+                Manage your projects, skills, articles, and custom collections
+                from one central dashboard with real-time edge API delivery.
               </p>
 
               {/* Value Highlights */}
@@ -347,7 +340,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     <Check className="w-3.5 h-3.5 stroke-[3]" />
                   </div>
                   <span className="text-xs text-slate-200">
-                    Firebase Auth for Login &amp; Sign Up
+                    Secure authentication &amp; instant session sync
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -355,7 +348,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     <Check className="w-3.5 h-3.5 stroke-[3]" />
                   </div>
                   <span className="text-xs text-slate-200">
-                    Prisma ORM database for content &amp; assets
+                    Dynamic schema collections for all portfolio content
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
@@ -374,10 +367,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               <div className="flex items-center justify-between">
                 <div>
                   <span className="text-xs font-bold text-white block">
-                    Firebase Auth + Prisma ORM
+                    PortfolioCMS Cloud
                   </span>
                   <span className="text-[11px] text-slate-400">
-                    Functional out of the box
+                    Production Ready &amp; Edge Synced
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -398,17 +391,10 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 <h3 className="text-2xl font-extrabold text-[#0F241D] tracking-tight">
                   {mode === "login" ? "Welcome back" : "Create your account"}
                 </h3>
-                <p className="text-xs text-[#52665B] mt-1 flex items-center gap-1.5">
-                  <span>Sign in using</span>
-                  <span className="inline-flex items-center gap-1 font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
-                    <Flame className="w-3 h-3 text-amber-500 fill-amber-500" />
-                    Firebase
-                  </span>
-                  <span>&amp; sync with</span>
-                  <span className="inline-flex items-center gap-1 font-semibold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                    <Database className="w-3 h-3 text-emerald-600" />
-                    Prisma DB
-                  </span>
+                <p className="text-xs text-[#52665B] mt-1">
+                  {mode === "login"
+                    ? "Enter your credentials to access your CMS workspace."
+                    : "Create an account to start managing your portfolio APIs."}
                 </p>
               </div>
 
@@ -479,7 +465,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
                   />
                 </svg>
-                <span>Continue with Google (Firebase)</span>
+                <span>Continue with Google</span>
               </button>
             </div>
 
@@ -606,7 +592,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     <span>
                       {mode === "login"
                         ? "Sign In to Workspace"
-                        : "Create Account with Prisma"}
+                        : "Create Account"}
                     </span>
                     <ArrowRight className="w-3.5 h-3.5 text-[#B8F256]" />
                   </>
@@ -650,8 +636,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
       {/* Footer */}
       <footer className="w-full py-4 text-center text-[11px] text-slate-400">
-        &copy; {new Date().getFullYear()} portfolioCMS Inc. &bull; Firebase
-        Authentication &bull; Prisma ORM Database
+        &copy; {new Date().getFullYear()} portfolioCMS Inc. &bull; All rights reserved.
       </footer>
 
       {/* 1-Click Google Sign In Dialog */}
@@ -684,7 +669,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                   Sign In with Google
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Firebase Authentication connected to Prisma ORM
+                  Fast 1-click access to your workspace
                 </p>
               </div>
             </div>

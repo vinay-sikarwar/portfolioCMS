@@ -8,7 +8,9 @@ import {
   ArrowRight,
   CreditCard,
   CheckCircle2,
-  Users
+  Users,
+  Zap,
+  Key
 } from 'lucide-react';
 
 export const BentoGrid: React.FC = () => {
@@ -28,14 +30,14 @@ export const BentoGrid: React.FC = () => {
       {/* Bento Grid Layout */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
         
-        {/* Card 1: Empowering Your Web with Precision (Pale Lime Card) */}
+        {/* Card 1: Developer Ecosystem & Speed (Pale Lime Card) */}
         <div className="md:col-span-4 p-6 sm:p-7 bg-[#EFF8E8] rounded-2xl md:rounded-3xl border border-[#DCEBD2] relative overflow-hidden flex flex-col justify-between group">
           <div>
             <span className="text-xs font-semibold text-[#3F6B43] tracking-wide uppercase block mb-1.5">
-              Client Acceleration
+              Developer Ecosystem
             </span>
-            <h3 className="text-xl font-bold text-[#0F241D] leading-snug tracking-tight max-w-[200px]">
-              Empowering Your Wealth with Precision.
+            <h3 className="text-xl font-bold text-[#0F241D] leading-snug tracking-tight max-w-[220px]">
+              Empowering Modern Portfolios with Instant APIs.
             </h3>
 
             {/* Avatars Stack */}
@@ -57,7 +59,7 @@ export const BentoGrid: React.FC = () => {
             </div>
 
             <p className="mt-2 text-xs font-semibold text-slate-500">
-              Daily New Clients
+              Active Creators Publishing
             </p>
           </div>
 
@@ -65,10 +67,10 @@ export const BentoGrid: React.FC = () => {
             <div>
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-extrabold text-[#0F241D] tabular-nums tracking-tight">
-                  100
+                  100%
                 </span>
                 <span className="inline-flex items-center text-xs font-bold text-emerald-800 bg-[#D4F5A6] px-2 py-0.5 rounded-full">
-                  +90%
+                  +90% Speed
                 </span>
               </div>
             </div>
@@ -103,11 +105,11 @@ export const BentoGrid: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 2: Sales Analysis (Center Bar Chart Card) */}
+        {/* Card 2: API Traffic & Throughput (Center Bar Chart Card) */}
         <div className="md:col-span-5 p-6 sm:p-7 bg-white rounded-2xl md:rounded-3xl border border-[#E2E8DE] flex flex-col justify-between shadow-xs">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-slate-500">Sales Analysis</span>
+              <span className="text-xs font-semibold text-slate-500">Edge API Throughput</span>
               {/* Timeframe pill tabs */}
               <div className="flex items-center gap-1 bg-[#F3F6F1] p-1 rounded-lg">
                 {(['1M', '1Y', '3Y', 'All'] as const).map((tf) => (
@@ -128,10 +130,10 @@ export const BentoGrid: React.FC = () => {
 
             <div className="flex items-baseline gap-2 mb-1">
               <span className="text-3xl sm:text-4xl font-extrabold text-[#0F241D] tabular-nums tracking-tight">
-                $35,600
+                1.4M
               </span>
             </div>
-            <span className="text-xs text-slate-400 font-medium">Overall yield</span>
+            <span className="text-xs text-slate-400 font-medium">Global edge requests served</span>
           </div>
 
           {/* Vertical Bar Chart matching screenshot */}
@@ -157,38 +159,38 @@ export const BentoGrid: React.FC = () => {
           </div>
         </div>
 
-        {/* Card 3: 100K Active Portfolios (Dark Spruce Card) */}
+        {/* Card 3: Global Edge Latency & API Keys (Dark Spruce Card) */}
         <div className="md:col-span-3 p-6 sm:p-7 bg-[#0F241D] text-white rounded-2xl md:rounded-3xl border border-[#1A382E] flex flex-col justify-between relative overflow-hidden group shadow-md">
           {/* Subtle background glow */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#B8F256]/10 rounded-full blur-2xl pointer-events-none"></div>
 
           <div>
             <span className="text-4xl font-extrabold text-white tabular-nums tracking-tight block">
-              100K
+              &lt;35ms
             </span>
             <span className="text-xs text-slate-300 font-medium mt-1 block">
-              Embedded Active Clients
+              Global Edge Latency
             </span>
           </div>
 
-          {/* Mini Black Card with EMV Chip */}
+          {/* Mini Developer Access Card with Token */}
           <div className="my-6 p-4 rounded-xl bg-gradient-to-tr from-[#16352B] to-[#0A1A14] border border-[#234A3C] shadow-lg flex flex-col justify-between h-24 relative overflow-hidden group-hover:border-[#B8F256]/40 transition-colors">
             <div className="flex items-center justify-between">
-              {/* EMV Chip */}
+              {/* Key Icon / Auth Badge */}
               <div className="w-6 h-4.5 rounded bg-gradient-to-r from-amber-200 to-amber-400 border border-amber-500/50 flex items-center justify-center shadow-xs">
-                <div className="w-3 h-2 border-t border-b border-amber-600/40"></div>
+                <Key className="w-3 h-3 text-amber-900" />
               </div>
-              <span className="text-[10px] font-mono text-[#B8F256] font-bold">PORTFOLIO</span>
+              <span className="text-[10px] font-mono text-[#B8F256] font-bold">BEARER TOKEN</span>
             </div>
 
             <div className="flex items-center justify-between text-[9px] font-mono text-slate-400">
-              <span>•••• 4092</span>
-              <span>10/28</span>
+              <span>phq_live_•••• 4092</span>
+              <span>v1 / edge</span>
             </div>
           </div>
 
           <div className="flex items-center justify-between text-xs text-slate-300 font-medium">
-            <span>Sales Analysis</span>
+            <span>API Key Security</span>
             <ArrowRight className="w-3.5 h-3.5 text-[#B8F256]" />
           </div>
         </div>
@@ -206,10 +208,10 @@ export const BentoGrid: React.FC = () => {
 
           <div>
             <h4 className="text-base font-bold text-white tracking-tight mb-1">
-              Real Personalized Portfolio Growth
+              Instant Multi-Framework Delivery
             </h4>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Instant schema delivery across React, Next.js, and Astro frameworks without server rebuilds.
+              Query structured JSON across React, Next.js, and Astro with zero server rebuilds and instant cache revalidation.
             </p>
           </div>
         </div>
@@ -223,29 +225,29 @@ export const BentoGrid: React.FC = () => {
           <div>
             <div className="flex items-baseline gap-1.5">
               <span className="text-3xl font-extrabold text-[#0F241D] tabular-nums tracking-tight">
-                $100M
+                0ms
               </span>
             </div>
             <span className="text-xs text-slate-500 font-semibold block mt-1">
-              Processed Content Volume
+              Cold-Start Overhead
             </span>
           </div>
         </div>
 
-        {/* Card 6: Building a 100% Secure Financial Plan (Light Card with CTA) */}
+        {/* Card 6: Never Hardcode Portfolio Data (Light Card with CTA) */}
         <div className="md:col-span-5 p-6 bg-white rounded-2xl md:rounded-3xl border border-[#E2E8DE] flex flex-col justify-between shadow-xs">
           <div>
             <h4 className="text-lg font-bold text-[#0F241D] tracking-tight mb-2">
-              Building a 100% Secure Financial Plan
+              Never Hardcode Your Portfolio Data Again
             </h4>
             <p className="text-xs text-[#4E6258] leading-relaxed">
-              Give your frontend best real-time content sync, automated schema caching, and layout control.
+              Update projects, skills, and articles through a sleek dashboard. Edits reflect on your live website in real time.
             </p>
           </div>
 
           <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-            <a href="#pricing" className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0F241D] hover:text-emerald-800 transition-colors">
-              <span>Learn More</span>
+            <a href="#features" className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0F241D] hover:text-emerald-800 transition-colors">
+              <span>Explore Architecture</span>
               <ArrowRight className="w-3.5 h-3.5 text-[#0F241D]" />
             </a>
           </div>
@@ -257,41 +259,41 @@ export const BentoGrid: React.FC = () => {
       <div className="mt-8 p-6 sm:p-7 bg-[#F4F7F2] rounded-2xl md:rounded-3xl border border-[#E0E7DC] grid grid-cols-2 md:grid-cols-4 gap-6 text-center sm:text-left">
         <div className="space-y-1">
           <div className="flex items-center justify-center sm:justify-start gap-1 text-2xl sm:text-3xl font-extrabold text-[#0F241D] tabular-nums">
-            <span className="text-emerald-700 font-bold">↑</span>
-            <span>50%</span>
+            <span className="text-emerald-700 font-bold">⚡</span>
+            <span>&lt;35ms</span>
           </div>
           <span className="text-xs font-semibold text-[#4E6258] block">
-            Traffic Acquisition
+            Global Edge Latency
           </span>
         </div>
 
         <div className="space-y-1">
           <div className="flex items-center justify-center sm:justify-start gap-1 text-2xl sm:text-3xl font-extrabold text-[#0F241D] tabular-nums">
-            <span className="text-emerald-700 font-bold">↑</span>
-            <span>65%</span>
+            <span className="text-emerald-700 font-bold">🚀</span>
+            <span>0s</span>
           </div>
           <span className="text-xs font-semibold text-[#4E6258] block">
-            Sales Projects
+            Build Time on Edits
           </span>
         </div>
 
         <div className="space-y-1">
           <div className="flex items-center justify-center sm:justify-start gap-1 text-2xl sm:text-3xl font-extrabold text-[#0F241D] tabular-nums">
-            <span className="text-emerald-700 font-bold">↑</span>
-            <span>45%</span>
+            <span className="text-emerald-700 font-bold">🌐</span>
+            <span>100%</span>
           </div>
           <span className="text-xs font-semibold text-[#4E6258] block">
-            Improved Security
+            Framework Agnostic
           </span>
         </div>
 
         <div className="space-y-1">
           <div className="flex items-center justify-center sm:justify-start gap-1 text-2xl sm:text-3xl font-extrabold text-[#0F241D] tabular-nums">
-            <span className="text-emerald-700 font-bold">↑</span>
-            <span>70%</span>
+            <span className="text-emerald-700 font-bold">🛡️</span>
+            <span>99.9%</span>
           </div>
           <span className="text-xs font-semibold text-[#4E6258] block">
-            Toolkit Engagement
+            Edge Cache Hit Ratio
           </span>
         </div>
       </div>

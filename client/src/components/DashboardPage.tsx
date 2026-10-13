@@ -422,6 +422,7 @@ const INITIAL_FIELDS_BY_SECTION: Record<string, FieldDefinition[]> = {
     },
   ],
 };
+INITIAL_FIELDS_BY_SECTION.posts = INITIAL_FIELDS_BY_SECTION.blog;
 
 const INITIAL_ITEMS_BY_SECTION: Record<string, ItemData[]> = {};
 
@@ -569,11 +570,16 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 try {
                   const parsed = typeof s.fields === "string" ? JSON.parse(s.fields) : s.fields;
                   if (Array.isArray(parsed) && parsed.length > 0) {
-                    setFieldsBySection((prev) => ({
-                      ...prev,
-                      [s.id]: parsed,
-                      [s.slug]: parsed,
-                    }));
+                    setFieldsBySection((prev) => {
+                      const next = {
+                        ...prev,
+                        [s.id]: parsed,
+                        [s.slug]: parsed,
+                        ...(s.slug === "posts" ? { blog: parsed } : {}),
+                      };
+                      persistFields(next);
+                      return next;
+                    });
                   }
                 } catch {}
               }
@@ -686,9 +692,48 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   // Active section helper
   const activeSection =
-    sections.find((s) => s.id === activeSectionId) || sections[0];
-  const currentItems = itemsBySection[activeSectionId] || [];
-  const currentFields = fieldsBySection[activeSectionId] || [];
+    sections.find((s) => s.id === activeSectionId || s.slug === activeSectionId) || sections[0];
+  const currentItems =
+    itemsBySection[activeSectionId] ||
+    itemsBySection[activeSection?.slug] ||
+    itemsBySection[activeSection?.id] ||
+    [];
+  const currentFields: FieldDefinition[] =
+    (fieldsBySection[activeSectionId] && fieldsBySection[activeSectionId].length > 0
+      ? fieldsBySection[activeSectionId]
+      : undefined) ||
+    (fieldsBySection[activeSection?.slug] && fieldsBySection[activeSection?.slug].length > 0
+      ? fieldsBySection[activeSection?.slug]
+      : undefined) ||
+    (fieldsBySection[activeSection?.id] && fieldsBySection[activeSection?.id].length > 0
+      ? fieldsBySection[activeSection?.id]
+      : undefined) ||
+    INITIAL_FIELDS_BY_SECTION[activeSection?.slug] ||
+    INITIAL_FIELDS_BY_SECTION[activeSection?.id] ||
+    INITIAL_FIELDS_BY_SECTION[activeSectionId] ||
+    [];
+
+  // Update item in active section state and persist reliably
+  const updateActiveItem = (updatedItem: ItemData) => {
+    setItemsBySection((prev) => {
+      const currentList =
+        prev[activeSectionId] ||
+        prev[activeSection?.slug] ||
+        prev[activeSection?.id] ||
+        [];
+      const updatedList = currentList.map((i) =>
+        i.id === updatedItem.id ? updatedItem : i
+      );
+      const next = {
+        ...prev,
+        [activeSectionId]: updatedList,
+        [activeSection.slug]: updatedList,
+        ...(activeSection.id ? { [activeSection.id]: updatedList } : {}),
+      };
+      persistItems(next);
+      return next;
+    });
+  };
 
   // Active item in editor
   const activeItem =
@@ -935,7 +980,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     setNewSectionDescription("");
     setNewSectionType("normal");
 
-    showToast(`Created new ${newSectionType === "editor" ? "Text Editor" : "Normal"} collection "${newSec.name}" in Neon DB!`);
+    showToast(`Created new ${newSectionType === "editor" ? "Text Editor" : "Normal"} collection "${newSec.name}"!`);
   };
 
   // -------------------------------------------------------------
@@ -1124,7 +1169,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     });
 
     setIsAddModalOpen(false);
-    showToast(`Added ${activeSection.singularName}: "${newItem.title}" to Neon DB!`);
+    showToast(`Added ${activeSection.singularName}: "${newItem.title}"!`);
   };
 
   // -------------------------------------------------------------
@@ -1193,7 +1238,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       required: newFieldRequired,
       isSystem: false,
       placeholder: `Enter ${newFieldLabel.trim()}...`,
-      subFields: newFieldType === "nested" ? nestedSubFields : undefined,
+      subFields: newFieldType === "nested" ? [...nestedSubFields] : undefined,
     };
 
     setEditingFieldsList((prev) => [...prev, newField]);
@@ -1202,6 +1247,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     setNewFieldRequired(false);
     setNestedSubFields([]);
     setTempSubFieldLabel("");
+    showToast(`Added field "${newField.label}" to list`);
+  };
+
+  // Toggle required state on existing field
+  const handleToggleFieldRequired = (id: string) => {
+    setEditingFieldsList((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, required: !f.required } : f))
+    );
   };
 
   // Delete field from schema list
@@ -1263,20 +1316,47 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   // Save schema changes
   const handleSaveFieldsSchema = async () => {
+    let fieldsToSave = [...editingFieldsList];
+
+    // If user filled out newFieldLabel but didn't click "Append Field to Schema",
+    // automatically append it before saving so their entered field is never lost!
+    if (newFieldLabel.trim()) {
+      const key = newFieldLabel
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]/g, "_");
+
+      if (!fieldsToSave.some((f) => f.key === key)) {
+        fieldsToSave.push({
+          id: `field_${Date.now()}`,
+          key,
+          label: newFieldLabel.trim(),
+          type: newFieldType,
+          required: newFieldRequired,
+          isSystem: false,
+          placeholder: `Enter ${newFieldLabel.trim()}...`,
+          subFields: newFieldType === "nested" ? [...nestedSubFields] : undefined,
+        });
+      }
+    }
+
     setFieldsBySection((prev) => {
       const next = {
         ...prev,
-        [activeSectionId]: editingFieldsList,
-        [activeSection.slug]: editingFieldsList,
+        [activeSectionId]: fieldsToSave,
+        [activeSection.slug]: fieldsToSave,
+        ...(activeSection.id ? { [activeSection.id]: fieldsToSave } : {}),
+        ...(activeSection.slug === "posts" ? { blog: fieldsToSave } : {}),
       };
       persistFields(next);
       return next;
     });
 
     const token = localStorage.getItem("portfoliohq_token");
-    if (currentUser?.apiSlug && token && activeSection.id) {
+    const sectionIdentifier = activeSection.id || activeSection.slug || activeSectionId;
+    if (currentUser?.apiSlug && token && sectionIdentifier) {
       try {
-        await fetch(apiUrl(`/api/v1/${currentUser.apiSlug}/sections/${activeSection.id}`), {
+        await fetch(apiUrl(`/api/v1/${currentUser.apiSlug}/sections/${sectionIdentifier}`), {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
@@ -1285,9 +1365,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           body: JSON.stringify({
             name: activeSection.name,
             singularName: activeSection.singularName,
+            slug: activeSection.slug,
             icon: activeSection.icon,
             description: activeSection.description,
-            fields: editingFieldsList,
+            fields: fieldsToSave,
           }),
         });
       } catch (err) {
@@ -1295,6 +1376,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
       }
     }
 
+    setNewFieldLabel("");
+    setNestedSubFields([]);
     setIsEditFieldsModalOpen(false);
     showToast(`Schema updated for ${activeSection.name}!`);
   };
@@ -1415,7 +1498,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
     }
     persistItems(itemsBySection);
     setIsPublishing(false);
-    showToast(`Published "${activeItem.title}" to Neon DB & Live API!`);
+    showToast(`Published "${activeItem.title}" to Live API!`);
   };
 
   const toggleFormat = (format: string) => {
@@ -2467,15 +2550,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                                 coverImage: imgUrl,
                                 photo: imgUrl,
                               };
-                              setItemsBySection((prev) => ({
-                                ...prev,
-                                [activeSectionId]: (prev[activeSectionId] || []).map((i) =>
-                                  i.id === activeItem.id ? next : i
-                                ),
-                                [activeSection.slug]: (prev[activeSection.slug] || []).map((i) =>
-                                  i.id === activeItem.id ? next : i
-                                ),
-                              }));
+                              updateActiveItem(next);
                             }}
                             label={`${activeSection.singularName} Image / Photo`}
                             helperText={`Upload at most one photo for this ${activeSection.singularName.toLowerCase()}. Auto-compressed to WebP.`}
@@ -2503,15 +2578,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                                       ...activeItem,
                                       [field.key]: imgUrl,
                                     };
-                                    setItemsBySection((prev) => ({
-                                      ...prev,
-                                      [activeSectionId]: (prev[activeSectionId] || []).map((i) =>
-                                        i.id === activeItem.id ? next : i
-                                      ),
-                                      [activeSection.slug]: (prev[activeSection.slug] || []).map((i) =>
-                                        i.id === activeItem.id ? next : i
-                                      ),
-                                    }));
+                                    updateActiveItem(next);
                                   }}
                                   label={field.label}
                                   compact
@@ -2574,16 +2641,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                                                 ...activeItem,
                                                 [field.key]: updatedNested,
                                               };
-                                              setItemsBySection((prev) => ({
-                                                ...prev,
-                                                [activeSectionId]: prev[
-                                                  activeSectionId
-                                                ].map((i) =>
-                                                  i.id === activeItem.id
-                                                    ? next
-                                                    : i
-                                                ),
-                                              }));
+                                              updateActiveItem(next);
                                             }}
                                             placeholder={sf.placeholder}
                                             className="w-full p-2 bg-white rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
@@ -2601,16 +2659,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                                                 ...activeItem,
                                                 [field.key]: updatedNested,
                                               };
-                                              setItemsBySection((prev) => ({
-                                                ...prev,
-                                                [activeSectionId]: prev[
-                                                  activeSectionId
-                                                ].map((i) =>
-                                                  i.id === activeItem.id
-                                                    ? next
-                                                    : i
-                                                ),
-                                              }));
+                                              updateActiveItem(next);
                                             }}
                                             placeholder={sf.placeholder}
                                             className="w-full p-2 bg-white rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
@@ -2644,14 +2693,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                                       ...activeItem,
                                       [field.key]: e.target.value,
                                     };
-                                    setItemsBySection((prev) => ({
-                                      ...prev,
-                                      [activeSectionId]: prev[
-                                        activeSectionId
-                                      ].map((i) =>
-                                        i.id === activeItem.id ? next : i
-                                      ),
-                                    }));
+                                    updateActiveItem(next);
                                   }}
                                   className="w-full text-xl font-extrabold text-[#0F241D] focus:outline-none placeholder-slate-400 tracking-tight pb-1 border-b border-transparent focus:border-[#B8F256]"
                                 />
@@ -2677,14 +2719,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                                       ...activeItem,
                                       [field.key]: e.target.value,
                                     };
-                                    setItemsBySection((prev) => ({
-                                      ...prev,
-                                      [activeSectionId]: prev[
-                                        activeSectionId
-                                      ].map((i) =>
-                                        i.id === activeItem.id ? next : i
-                                      ),
-                                    }));
+                                    updateActiveItem(next);
                                   }}
                                   className={`w-full p-3 rounded-xl border border-slate-200 text-xs sm:text-sm text-slate-700 leading-relaxed focus:outline-none focus:border-[#0F241D] resize-none ${
                                     activeFormatting.includes("bold")
@@ -2714,14 +2749,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                                       ...activeItem,
                                       [field.key]: e.target.value,
                                     };
-                                    setItemsBySection((prev) => ({
-                                      ...prev,
-                                      [activeSectionId]: prev[
-                                        activeSectionId
-                                      ].map((i) =>
-                                        i.id === activeItem.id ? next : i
-                                      ),
-                                    }));
+                                    updateActiveItem(next);
                                   }}
                                   className="w-full p-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 bg-white focus:outline-none focus:border-[#0F241D]"
                                 >
@@ -2752,14 +2780,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                                     ...activeItem,
                                     [field.key]: e.target.value,
                                   };
-                                  setItemsBySection((prev) => ({
-                                    ...prev,
-                                    [activeSectionId]: prev[
-                                      activeSectionId
-                                    ].map((i) =>
-                                      i.id === activeItem.id ? next : i
-                                    ),
-                                  }));
+                                  updateActiveItem(next);
                                 }}
                                 className="w-full p-2.5 rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
                               />
@@ -3357,18 +3378,27 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                             }`}
                           ></span>
                           <div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-bold text-slate-800">
                                 {field.label}
                               </span>
                               <span className="font-mono text-[10px] text-slate-400">
                                 ({field.key})
                               </span>
-                              {field.required && (
-                                <span className="text-[9px] px-1.5 py-0.2 bg-rose-100 text-rose-700 font-bold rounded">
-                                  Required
+                              <label
+                                className="inline-flex items-center gap-1 cursor-pointer select-none text-[10px] px-1.5 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
+                                title="Toggle required"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={!!field.required}
+                                  onChange={() => handleToggleFieldRequired(field.id)}
+                                  className="w-3 h-3 text-[#0F241D] rounded accent-[#0F241D]"
+                                />
+                                <span className={field.required ? "text-rose-600 font-bold" : "text-slate-400 font-medium"}>
+                                  {field.required ? "Required" : "Optional"}
                                 </span>
-                              )}
+                              </label>
                               {field.type === "nested" && (
                                 <span className="text-[9px] px-1.5 py-0.2 bg-emerald-100 text-emerald-800 font-bold rounded">
                                   Nested Object
@@ -3388,6 +3418,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                             </span>
                           ) : (
                             <button
+                              type="button"
                               onClick={() => handleDeleteField(field.id)}
                               className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
                               title="Remove Field"
@@ -3476,6 +3507,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       placeholder="e.g. SEO Metadata, Client Info, Social Links, Metrics"
                       value={newFieldLabel}
                       onChange={(e) => setNewFieldLabel(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddCustomField();
+                        }
+                      }}
                       className="w-full p-2 bg-white rounded-xl border border-slate-200 text-xs text-slate-800 focus:outline-none focus:border-[#0F241D]"
                     />
                   </div>
